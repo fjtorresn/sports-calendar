@@ -1,0 +1,33 @@
+[tool.ruff]
+# Longitud máxima de línea (119 es el estándar moderno, más cómodo que 88 o 79)
+line-length = 119
+target-version = "py311"
+
+[tool.ruff.lint]
+# Seleccionamos las reglas a validar:
+# E: Errores de estilo (pep8)
+# F: Errores lógicos (variables no usadas, importaciones perdidas)
+# I: Ordenamiento automático de importaciones (isort)
+select = ["E", "F", "I"]
+ignore = []
+
+# Excluimos carpetas que el linter no debe tocar
+exclude = [
+    ".git",
+    ".github",
+    "__pycache__",
+    "alembic",
+    "venv",
+]
+
+[tool.pytest.ini_options]
+# Configuración básica para las pruebas automatizadas
+minversion = "7.0"
+addopts = "-v -s"
+testpaths = [
+    "tests",
+]
+# Agregamos src al path para que los tests puedan importar tu código sin problemas
+pythonpath = [
+    "src",
+]

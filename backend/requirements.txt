@@ -1,0 +1,24 @@
+# Web framework y servidor
+fastapi==0.111.0
+uvicorn[standard]==0.29.0
+
+# Base de datos y migraciones
+sqlalchemy==2.0.30
+psycopg2-binary==2.9.9
+alembic==1.13.1
+
+# Validación y configuraciones
+pydantic==2.7.1
+pydantic-settings==2.2.1
+
+# Tareas en segundo plano (Web Scraping)
+celery==5.4.0
+redis==5.0.4
+
+# Herramientas de Scraping (Las usaremos en la Fase 3)
+beautifulsoup4==4.12.3
+httpx==0.27.0
+
+# Calidad de código y pruebas
+pytest==8.2.0
+ruff==0.4.4

@@ -1,0 +1,55 @@
+version: '3.8'
+
+services:
+  # 1. El Cerebro (FastAPI)
+  api:
+    build: .
+    # Levanta el servidor con recarga automática para desarrollo
+    command: uvicorn src.app.api.main:app --host 0.0.0.0 --port 8000 --reload
+    ports:
+      - "8000:8000"
+    volumes:
+      # Sincroniza tu código local con el contenedor
+      - .:/app
+    environment:
+      - DATABASE_URL=postgresql://postgres:admin123@db:5432/calendario_db
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      - db
+      - redis
+
+  # 2. Los Músculos / Web Scraping (Worker Celery)
+  worker:
+    build: .
+    command: celery -A src.app.workers.tasks worker --loglevel=info
+    volumes:
+      - .:/app
+    environment:
+      - DATABASE_URL=postgresql://postgres:admin123@db:5432/calendario_db
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      - db
+      - redis
+
+  # 3. La Bóveda de Seguridad (PostgreSQL)
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: admin123
+      POSTGRES_DB: calendario_db
+    ports:
+      - "5432:5432"
+    volumes:
+      # Guarda los datos físicamente para no perderlos si se apaga el contenedor
+      - postgres_data:/var/lib/postgresql/data
+
+  # 4. El Mensajero y Caché (Redis)
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+# Declaración del volumen persistente para la base de datos
+volumes:
+  postgres_data:

@@ -1,0 +1,46 @@
+name: Backend CI
+
+# ¿Cuándo se ejecutará esto?
+on:
+  push:
+    branches: [ "main", "dev" ]
+  pull_request:
+    branches: [ "main", "dev" ]
+
+jobs:
+  code-quality-and-tests:
+    runs-on: ubuntu-latest
+
+    steps:
+    # 1. Clona tu repositorio en la máquina de GitHub
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    # 2. Instala la versión de Python que estamos usando
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.11"
+        cache: 'pip' # Acelera la instalación guardando las dependencias en caché
+
+    # 3. Instala las dependencias de tu proyecto
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install ruff pytest
+
+    # 4. Ejecuta Ruff para revisar estilo y formato
+    - name: Run Ruff Linter
+      run: |
+        ruff check .
+        ruff format --check .
+
+    # 5. Ejecuta Pytest para asegurar que la lógica no se rompió
+    - name: Run Pytest
+      # Configuramos variables de entorno de prueba para que no intente conectarse a la BD real
+      env:
+        DATABASE_URL: sqlite:///./test.db
+        REDIS_URL: redis://localhost:6379/0
+      run: |
+        pytest tests/

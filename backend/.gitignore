@@ -1,0 +1,56 @@
+# ========================================
+# Entornos Virtuales
+# ========================================
+venv/
+.venv/
+env/
+ENV/
+
+# ========================================
+# Variables de Entorno y Secretos
+# ========================================
+.env
+.env.*
+!.env.example
+
+# ========================================
+# Caché de Python y Compilados
+# ========================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# ========================================
+# Herramientas de Calidad (Ruff, Pytest)
+# ========================================
+.ruff_cache/
+.pytest_cache/
+.coverage
+htmlcov/
+coverage.xml
+*.log
+
+# ========================================
+# Bases de Datos Locales
+# ========================================
+*.sqlite3
+test.db
+postgres_data/
+
+# ========================================
+# IDEs y Sistemas Operativos
+# ========================================
+.vscode/
+.idea/
+.DS_Store
+__MACOSX/
+Thumbs.db
+
+# ========================================
+# Build y Distribución
+# ========================================
+build/
+dist/
+*.egg-info/
