@@ -146,7 +146,126 @@ Cada fuente implementa la misma interfaz (`EventProvider`). El resto del sistema
 
 ## 4. Modelo de datos v2
 
-> _Pendiente._
+### 4.1 Cambios respecto a v1
+
+| v1 | v2 | Por qué |
+|---|---|---|
+| `teams` + `players` por separado; `event_participants` polimórfico (`participant_type` + `participant_id` sin FK) | Una sola tabla **`competitors`** (`kind = team \| individual`); `event_participants.competitor_id` con FK real | Integridad referencial; Barcelona, Djokovic, Verstappen y Red Bull son todos "quien compite". Una suscripción apunta a un solo `competitor_id` |
+| — | **`event_kinds`** por deporte (F1: `practice`, `qualifying`, `sprint`, `race`; fútbol: `match`) + **`subscription_event_kinds`** | El usuario elige qué tipos de sesión quiere (RF-2, decisión F1 = opción *d*) |
+| `result_details JSONB` | Se elimina | Fuera de alcance (§2.3) |
+| `status` texto libre | Enum: `scheduled`, `postponed`, `cancelled`, `finished` | RF-6; un valor inválido no llega a la base de datos |
+| — | `time_precision` (`exact`, `not_before`, `date_only`) | §2.5.1 |
+| — | `parent_event_id` | Agrupar las sesiones de un Gran Premio (y más adelante las rondas de un torneo) |
+| — | Tablas `*_external_refs` | Una entidad puede venir de varias fuentes (§3.3.3) |
+| — | `sync_state` | Saber cuándo se sincronizó cada competición (RNF-1, RNF-2) |
+| `users` sin zona horaria | `timezone`, `ical_token`, `created_at` | RF-4, RF-7 |
+
+### 4.2 Diagrama entidad-relación
+
+```mermaid
+erDiagram
+    sports ||--o{ competitions : tiene
+    sports ||--o{ competitors : tiene
+    sports ||--o{ event_kinds : define
+    nations ||--o{ competitors : representa
+    nations ||--o{ competitions : organiza
+    competitions ||--o{ events : agrupa
+    event_kinds ||--o{ events : clasifica
+    events ||--o{ events : "parent_event_id"
+    events ||--o{ event_participants : tiene
+    competitors ||--o{ event_participants : participa
+    users ||--o{ subscriptions : crea
+    subscriptions ||--o{ subscription_event_kinds : filtra
+    event_kinds ||--o{ subscription_event_kinds : ""
+    competitions ||--o{ sync_state : ""
+
+    competitors {
+        int id PK
+        int sport_id FK
+        string kind "team | individual"
+        string name
+        int nation_id FK "nullable"
+    }
+    events {
+        int id PK
+        int sport_id FK
+        int competition_id FK "nullable"
+        int event_kind_id FK
+        int parent_event_id FK "nullable"
+        string title "ej. GP de México – Carrera"
+        timestamptz start_time
+        enum time_precision
+        enum status
+        string venue "nullable"
+        timestamptz updated_at
+    }
+    subscriptions {
+        int id PK
+        int user_id FK
+        int sport_id FK "nullable"
+        int competition_id FK "nullable"
+        int competitor_id FK "nullable"
+        int nation_id FK "nullable"
+    }
+    users {
+        int id PK
+        string email UK
+        string hashed_password
+        string timezone "IANA, ej. America/Santiago"
+        string ical_token UK
+    }
+```
+
+### 4.3 Semántica de las suscripciones
+
+- **Dentro** de una suscripción, los filtros se combinan con **Y**:
+  `competitor = Barcelona` **y** `competition = Champions`.
+- **Entre** suscripciones se combinan con **O** (RF-3).
+- `subscription_event_kinds` **vacío = todos los tipos**. La interfaz preselecciona
+  los tipos por defecto del deporte (`event_kinds.is_default`; en F1:
+  clasificación, sprint y carrera), así el usuario solo cambia lo que quiere.
+- `nation_id`: eventos donde participa un competidor de esa nación (selecciones
+  nacionales, tenistas de un país).
+
+### 4.4 La consulta central
+
+Todo el sistema (calendario web, app y feed iCal) depende de esta consulta, así
+que hay que diseñarla y crear sus índices desde el principio:
+
+```sql
+SELECT DISTINCT e.*
+FROM events e
+JOIN subscriptions s ON s.user_id = :user_id
+WHERE e.start_time BETWEEN :from AND :to
+  AND (s.sport_id       IS NULL OR e.sport_id       = s.sport_id)
+  AND (s.competition_id IS NULL OR e.competition_id = s.competition_id)
+  AND (s.competitor_id  IS NULL OR EXISTS (
+        SELECT 1 FROM event_participants p
+        WHERE p.event_id = e.id AND p.competitor_id = s.competitor_id))
+  AND (s.nation_id      IS NULL OR EXISTS (
+        SELECT 1 FROM event_participants p JOIN competitors c ON c.id = p.competitor_id
+        WHERE p.event_id = e.id AND c.nation_id = s.nation_id))
+  AND (NOT EXISTS (SELECT 1 FROM subscription_event_kinds k WHERE k.subscription_id = s.id)
+       OR e.event_kind_id IN (SELECT k.event_kind_id FROM subscription_event_kinds k
+                              WHERE k.subscription_id = s.id));
+```
+
+Índices iniciales: `events (competition_id, start_time)`, `events (sport_id, start_time)`,
+`event_participants (competitor_id, event_id)` y `subscriptions (user_id)`.
+Cuando haya datos reales se valida con `EXPLAIN ANALYZE`, no a ojo.
+
+### 4.5 Mapeo con fuentes externas
+
+```
+competition_external_refs (competition_id FK, source, external_id)  UNIQUE (source, external_id)
+competitor_external_refs  (competitor_id  FK, source, external_id)  UNIQUE (source, external_id)
+event_external_refs       (event_id       FK, source, external_id)  UNIQUE (source, external_id)
+```
+
+Usamos tres tablas con la misma forma en lugar de una sola `external_ids`
+polimórfica: es la misma razón por la que eliminamos el `event_participants`
+polimórfico, cada fila tiene una FK real. El `UNIQUE (source, external_id)`
+es lo que hace **idempotente** el upsert de la ingesta.
 
 ## 5. Arquitectura
 
