@@ -17,11 +17,62 @@ web, en la app móvil y en su calendario habitual (Google / Apple) vía feed iCa
 
 ## 2. Requisitos
 
-> _Pendiente — se completa en la siguiente iteración._
-
 ### 2.1 Funcionales
-### 2.2 No funcionales (escala, disponibilidad, frescura de datos)
+
+| ID | Requisito |
+|---|---|
+| RF-1 | El usuario se registra e inicia sesión. |
+| RF-2 | El usuario crea, lista y elimina **suscripciones**. Cada una combina uno o más filtros (deporte, competición, equipo, jugador, nación) que se unen con **Y**. Ejemplo: *equipo = Barcelona* **y** *competición = Champions*. |
+| RF-3 | El calendario del usuario contiene los eventos que cumplen **al menos una** de sus suscripciones (las suscripciones se unen con **O**). |
+| RF-4 | Cada evento muestra **fecha, hora** (en la zona horaria del usuario), participantes y competición. |
+| RF-5 | Solo aparecen eventos **confirmados**. En los torneos por eliminación (tenis, playoffs) se muestra el próximo partido de un participante recién cuando está definido: si Djokovic gana su primer partido en Shanghái, el siguiente aparece cuando se conozca la fecha y la hora. |
+| RF-6 | Los eventos que se postergan o cancelan se actualizan o se marcan; no quedan con datos viejos. |
+| RF-7 | El usuario obtiene una **URL iCal privada** para suscribirse desde Google Calendar o Apple Calendar, y puede regenerarla. |
+| RF-8 | Al crear una suscripción nueva, sus eventos aparecen sin esperar a la sincronización diaria (ver RNF-2). |
+
+### 2.2 No funcionales
+
+| ID | Requisito | Objetivo |
+|---|---|---|
+| RNF-1 | **Frescura de los datos** | Sincronización **diaria** de las competiciones que sigue al menos un usuario. |
+| RNF-2 | **Sincronización al suscribirse** | Si la competición nunca se sincronizó, o lleva más de 24 h sin sincronizar, se lanza una tarea en segundo plano. Si se sincronizó hace poco, no se repite, para no gastar cuota. |
+| RNF-3 | **Presupuesto de cuota** | No pasar el límite gratuito de cada fuente (≈100 req/día en API-Sports, 10 req/min en football-data). La ingesta lleva la cuenta de lo que consume. |
+| RNF-4 | **Escala objetivo** | 1000 usuarios con la infraestructura mínima (ver §6), y un camino claro para crecer 100 veces sin rediseñar. |
+| RNF-5 | **Rendimiento** | Calendario web y feed iCal en p95 < 300 ms. |
+| RNF-6 | **Extensibilidad** | Agregar un deporte o una fuente nueva = escribir un adaptador nuevo, sin cambiar la API ni el modelo central. |
+| RNF-7 | **Seguridad** | Contraseñas con hash, secretos solo en variables de entorno, token iCal largo y aleatorio que se puede revocar. |
+| RNF-8 | **Calidad** | CI con lint y tests en cada PR; los tests de la base de datos corren contra PostgreSQL real. |
+
 ### 2.3 Fuera de alcance (por ahora)
+
+- Resultados, marcadores y estadísticas. El modelo no debe impedir agregarlos después.
+- Resultados en vivo y notificaciones push.
+- Eventos creados por el usuario (está previsto, pero en una fase posterior).
+- Funciones sociales.
+
+### 2.4 Alcance del MVP
+
+**Fútbol + Fórmula 1.** Son los deportes con las mejores fuentes (football-data.org
+y Jolpica) y cubren los dos tipos de suscripción más comunes: por **equipo**
+(Barcelona en la Champions) y por **competición** (toda la F1).
+
+### 2.5 Implicaciones de diseño
+
+1. **La hora de un evento no siempre es exacta.** En tenis la programación suele
+   decir *"no antes de las 14:00"* o *"a continuación de"*, y en fútbol la fecha
+   de una jornada a veces se confirma antes que la hora. El modelo necesita
+   `start_time` + una **precisión** (`exact`, `not_before`, `date_only`).
+   En iCal, un evento `date_only` se publica como evento de todo el día.
+2. **Torneos por eliminación (RF-5).** No hace falta lógica especial: un partido
+   aparece cuando la fuente lo publica con sus participantes confirmados. Basta
+   con que el upsert por `external_id` actualice los eventos que ya tenemos.
+3. **Frecuencia adaptativa (después del MVP).** Con sincronizar una vez al día
+   puede pasar que el próximo partido de un tenista aparezca tarde. Más adelante
+   se puede sincronizar más seguido los torneos en curso, gastando cuota solo
+   donde importa.
+4. **Sin resultados ⇒ sin `result_details`.** Se elimina del modelo (no hay que
+   modelar lo que no se usa). Lo que sí se mantiene es `status`
+   (`scheduled`, `postponed`, `cancelled`, `finished`), necesario para RF-6.
 
 ---
 
