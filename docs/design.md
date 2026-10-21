@@ -3,7 +3,14 @@
 > Estado: **borrador** · Última actualización: 2026-10-21
 
 Este documento describe qué construimos, por qué y cómo. Las decisiones puntuales
-se registran como ADRs en [`docs/adr/`](adr/).
+se registran como ADRs en [`docs/adr/`](adr/):
+
+| ADR | Decisión |
+|---|---|
+| [0001](adr/0001-monorepo.md) | Monorepo para backend, web y mobile |
+| [0002](adr/0002-fuentes-de-datos-y-adaptadores.md) | Varias fuentes de datos detrás de una interfaz común |
+| [0003](adr/0003-competitors-unificados.md) | Una sola tabla `competitors` para equipos e individuos |
+| [0004](adr/0004-feed-ical.md) | Feed iCal con token privado y caché por TTL |
 
 ---
 
@@ -267,14 +274,146 @@ polimórfica: es la misma razón por la que eliminamos el `event_participants`
 polimórfico, cada fila tiene una FK real. El `UNIQUE (source, external_id)`
 es lo que hace **idempotente** el upsert de la ingesta.
 
+### 4.6 Extensión posterior al MVP: seguir jugadores dentro de un equipo
+
+**Semántica elegida:** seguir a un jugador = los eventos de **los equipos que integra**
+(club y selección), no solo los partidos en que está en la alineación. Las
+alineaciones se conocen ~1 h antes y no vienen en los planes gratuitos, así que
+no sirven para un calendario. La interfaz lo muestra como *"Partidos de los equipos de Messi"*.
+
+```
+competitor_memberships
+  member_id   FK → competitors (kind = individual)
+  team_id     FK → competitors (kind = team)
+  valid_from  date
+  valid_to    date NULL          -- NULL = vigente
+```
+
+Es una **relación temporal**: un traspaso cierra una pertenencia y abre otra, y
+las suscripciones existentes siguen funcionando sin cambios. La consulta central
+amplía el filtro por competidor a *"participa el competidor **o** un equipo al que
+pertenecía en la fecha del evento"*. El mismo mecanismo cubre las parejas de dobles
+en tenis y piloto ↔ escudería en F1.
+
+Pendiente: verificar de qué fuente se sincronizan los planteles y cuánta cuota consume.
+
 ## 5. Arquitectura
 
-> _Pendiente._
+### 5.1 Componentes
+
+```mermaid
+flowchart LR
+    subgraph Clientes
+        WEB[Web<br/>Next.js]
+        MOB[Mobile<br/>Expo · post-MVP]
+        CAL[Google / Apple<br/>Calendar]
+    end
+
+    subgraph Backend
+        API[API<br/>FastAPI · sin estado]
+        BEAT[Scheduler<br/>Celery Beat]
+        WRK[Workers<br/>Celery]
+        PROV[Adaptadores<br/>EventProvider]
+    end
+
+    PG[(PostgreSQL)]
+    RD[(Redis<br/>cola · caché · locks)]
+    EXT[APIs externas<br/>y sitios scrapeados]
+
+    WEB -- REST/JSON --> API
+    MOB -- REST/JSON --> API
+    CAL -- GET .ics --> API
+    API --> PG
+    API --> RD
+    BEAT -- encola tareas --> RD
+    RD -- consume --> WRK
+    WRK --> PROV --> EXT
+    WRK -- upsert --> PG
+```
+
+| Componente | Responsabilidad | Por qué así |
+|---|---|---|
+| **API** | Autenticación, suscripciones, calendario, feed iCal | **Sin estado**: para escalar basta con agregar instancias detrás de un balanceador |
+| **Workers** | Ingesta (llamar a las fuentes, normalizar, upsert) | Separados de la API: una fuente lenta o caída no afecta a los usuarios |
+| **Scheduler** | Dispara la sincronización diaria | Un solo proceso, para no encolar tareas duplicadas |
+| **PostgreSQL** | Fuente de verdad | Datos relacionales con restricciones fuertes; es justo lo que necesita el modelo |
+| **Redis** | Cola de Celery, caché del feed iCal, locks de sincronización, contadores de cuota | Ya está en el stack; cubre cuatro necesidades con una sola pieza |
+
+### 5.2 Flujos principales
+
+**A. Sincronización diaria (RNF-1)**
+1. Celery Beat encola `sync_followed_competitions` una vez al día.
+2. La tarea busca las competiciones con **al menos un suscriptor**, directo o
+   indirecto (un equipo seguido arrastra sus competiciones).
+3. Por cada una, encola `sync_competition(competition_id)`.
+4. `sync_competition` toma un **lock en Redis** (`SET NX` con expiración). Si otra
+   tarea ya está sincronizando esa competición, termina sin hacer nada.
+5. El adaptador descarga los datos, los **normaliza** a DTOs comunes, resuelve las
+   entidades con `*_external_refs` y hace **upsert**.
+6. Actualiza `sync_state.last_synced_at`.
+
+**B. Nueva suscripción (RF-8, RNF-2)**
+1. `POST /api/v1/subscriptions` guarda la suscripción y responde de inmediato.
+2. Si la competición involucrada tiene `last_synced_at` vacío o de hace más de 24 h,
+   encola `sync_competition`. El lock del paso A.4 evita duplicados.
+
+**C. Feed iCal (RF-7)**
+1. `GET /calendar/{ical_token}.ics` busca al usuario por su token.
+2. Si hay respuesta en caché en Redis (TTL 1 h), la devuelve.
+3. Si no, ejecuta la consulta central (§4.4), genera el `.ics` y lo guarda en caché.
+
+> **Usamos TTL en vez de invalidar la caché.** Invalidar exacto ("este cambio afecta
+> a estos usuarios") es complejo y propenso a errores. Como los datos se actualizan
+> una vez al día y Google consulta cada varias horas, una hora de retraso extra no
+> le importa a nadie. Es una decisión consciente: código más simple a cambio de
+> datos algo menos frescos.
+
+### 5.3 Control de cuota (RNF-3)
+
+Cada adaptador declara su límite (por ejemplo, `10/min` o `100/día`). Antes de cada
+llamada, un contador en Redis por fuente y por ventana de tiempo decide si se puede
+llamar. Si no hay cupo, la tarea **se reprograma** en vez de fallar.
+
+### 5.4 Decisiones abiertas
+
+- **Autenticación:** propia (JWT de acceso corto + refresh token) o con un proveedor
+  externo. Se decide en un ADR al empezar la fase de usuarios.
+- **Hosting:** se decide en la fase de despliegue.
 
 ## 6. Estimación de carga
 
-> _Pendiente — incluir el cálculo para 1000 usuarios (< 1 req/s de iCal)._
+Supuestos para **1000 usuarios**:
+
+| Concepto | Cálculo | Resultado |
+|---|---|---|
+| Feed iCal | 1000 usuarios × ~6 consultas/día de Google o Apple | 6000 req/día ≈ **0,07 req/s** |
+| Web/app | 200 activos/día × 20 req | 4000 req/día ≈ **0,05 req/s** |
+| Pico (×10 sobre el promedio) | | **~1–2 req/s** |
+| Eventos de fútbol (12 competiciones) | ~380 partidos × 7 ligas + copas | **~4000 eventos/temporada** |
+| Eventos de F1 | 24 GP × ~5 sesiones | **~120 eventos/temporada** |
+| Cuota de football-data | 12 competiciones × 1 sync/día | **12 req/día** (el límite es 10/min) |
+| Cuota de Jolpica | 1–2 req/día | Muy por debajo de 500/h |
+
+**Conclusión:** un servidor pequeño con PostgreSQL aguanta esta carga con mucho
+margen. El riesgo real **no es la carga sino la cuota de las fuentes**, y eso no
+depende de cuántos usuarios haya sino de cuántas competiciones se siguen.
+
+**Para crecer 100 veces (100 000 usuarios, ~100–200 req/s en pico)**, en este orden
+y solo cuando las métricas lo pidan:
+1. Más instancias de la API (es sin estado).
+2. Servir los `.ics` desde una CDN o desde Redis.
+3. Réplica de lectura de PostgreSQL para la consulta central.
+4. Más workers y, si hace falta, planes pagos en las fuentes.
 
 ## 7. Plan por fases
 
-> _Pendiente._
+| Fase | Contenido | Requisitos |
+|---|---|---|
+| **0. Base** | Mover el CI a `.github/workflows/` con PostgreSQL como servicio; `pydantic-settings` y secretos en `.env`; `docker-compose` en la raíz; README; `CLAUDE.md`; pre-commit con Ruff | RNF-7, RNF-8 |
+| **1. Diseño** | Este documento y los ADRs | — |
+| **2. Modelo v2** | Modelos SQLAlchemy y **una migración inicial nueva** (no hay datos en producción, así que reiniciar el historial de migraciones es más limpio que encadenar cambios); seed del catálogo | §4 |
+| **3. Ingesta** | Interfaz `EventProvider`; adaptadores de football-data y Jolpica; `sync_state`, locks y cuota; Celery Beat; tests con respuestas grabadas (fixtures) | RF-5, RF-6, RNF-1–3, RNF-6 |
+| **4. Usuarios y calendario** | Autenticación; CRUD de suscripciones; endpoint del calendario; feed iCal; sincronización al suscribirse | RF-1–4, RF-7, RF-8, RNF-5 |
+| **5. Web** | Cliente generado desde OpenAPI (`packages/api-client`); UI para crear suscripciones y ver el calendario | — |
+| **6. Despliegue** | Hosting, base de datos administrada, logs y métricas, alertas (por ejemplo, "un adaptador devolvió 0 eventos") | RNF-4 |
+| **Post-MVP** | Seguir jugadores (§4.6), tenis, básquet, NFL, MMA, boxeo (scraping), app móvil, eventos propios, frecuencia adaptativa | — |
