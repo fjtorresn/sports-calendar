@@ -1,20 +1,21 @@
 from datetime import datetime
-from typing import List, Optional
+
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
-from src.app.core.database import get_db
-from src.app.models.event import Event
-from src.app.schemas.event import EventResponse
+from app.core.database import get_db
+from app.models.event import Event
+from app.schemas.event import EventResponse
 
 router = APIRouter()
 
-@router.get("/", response_model=List[EventResponse])
+
+@router.get("/", response_model=list[EventResponse])
 def get_events(
     # Filtros opcionales en la URL (Query Params)
-    start_date: Optional[datetime] = Query(None, description="Fecha inicio (ISO 8601 UTC)"),
-    end_date: Optional[datetime] = Query(None, description="Fecha fin (ISO 8601 UTC)"),
-    db: Session = Depends(get_db)
+    start_date: datetime | None = Query(None, description="Fecha inicio (ISO 8601 UTC)"),
+    end_date: datetime | None = Query(None, description="Fecha fin (ISO 8601 UTC)"),
+    db: Session = Depends(get_db),
 ):
     # Iniciamos la consulta base
     query = db.query(Event)
@@ -30,5 +31,5 @@ def get_events(
 
     # Ejecutamos la búsqueda en la BD
     events = query.all()
-    
+
     return events

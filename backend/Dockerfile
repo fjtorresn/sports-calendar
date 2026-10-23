@@ -1,24 +1,28 @@
-# Usamos la versión oficial de Python (ligera)
-FROM python:3.11-slim
+FROM python:3.13-slim
 
-# Evita que Python escriba archivos .pyc y fuerza a que la salida de consola sea inmediata
-ENV PYTHONDONTWRITEBYTECODE=1
-ENV PYTHONUNBUFFERED=1
+# uv se copia desde su imagen oficial (versión fijada para builds reproducibles).
+COPY --from=ghcr.io/astral-sh/uv:0.13 /uv /uvx /bin/
 
-# Establecemos el directorio de trabajo dentro del contenedor
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    UV_COMPILE_BYTECODE=1 \
+    UV_LINK_MODE=copy \
+    UV_PROJECT_ENVIRONMENT=/opt/venv \
+    PATH="/opt/venv/bin:$PATH"
+
 WORKDIR /app
 
-# Instalamos dependencias del sistema necesarias para compilar ciertos paquetes (como psycopg2)
-RUN apt-get update && apt-get install -y \
-    gcc \
-    libpq-dev \
-    && rm -rf /var/lib/apt/lists/*
+# 1) Solo dependencias: esta capa se reutiliza mientras pyproject.toml/uv.lock no cambien.
+COPY pyproject.toml uv.lock ./
+RUN uv sync --frozen --no-dev --no-install-project
 
-# Copiamos primero solo el archivo de requerimientos (aprovecha la caché de Docker)
-COPY requirements.txt .
-
-# Instalamos las librerías de Python
-RUN pip install --no-cache-dir -r requirements.txt
-
-# Copiamos el resto del código del proyecto
+# 2) El código del proyecto.
 COPY . .
+RUN uv sync --frozen --no-dev
+
+# No correr como root dentro del contenedor.
+RUN useradd --create-home --uid 1000 appuser
+USER appuser
+
+EXPOSE 8000
+CMD ["uvicorn", "app.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
