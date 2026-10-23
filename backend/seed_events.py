@@ -1,12 +1,13 @@
-from datetime import datetime, timedelta, timezone
-from src.app.core.database import SessionLocal
-from src.app.models.event import Event, EventParticipant
-from src.app.models.sports import Sport
-from src.app.models.user import *
+from datetime import UTC, datetime, timedelta
+
+from app.core.database import SessionLocal
+from app.models.event import Event, EventParticipant
+from app.models.sports import Sport
+
 
 def seed_events():
     db = SessionLocal()
-    
+
     try:
         # Verificar que los deportes base existan
         futbol = db.query(Sport).filter(Sport.name == "Fútbol").first()
@@ -25,24 +26,19 @@ def seed_events():
 
         print("📅 Iniciando la siembra de Eventos actualizados...")
 
-        now_utc = datetime.now(timezone.utc)
+        now_utc = datetime.now(UTC)
         ayer = now_utc - timedelta(days=1)
         manana = now_utc + timedelta(days=1)
 
         # 1. Evento de Fútbol (asignando el sport_id)
-        evento_futbol = Event(
-            sport_id=futbol.id,
-            start_time=manana,
-            status="scheduled",
-            result_details=None 
-        )
+        evento_futbol = Event(sport_id=futbol.id, start_time=manana, status="scheduled", result_details=None)
         db.add(evento_futbol)
         db.commit()
         db.refresh(evento_futbol)
 
         participantes_futbol = [
             EventParticipant(event_id=evento_futbol.id, participant_type="team", participant_id=1, is_home=True),
-            EventParticipant(event_id=evento_futbol.id, participant_type="team", participant_id=2, is_home=False)
+            EventParticipant(event_id=evento_futbol.id, participant_type="team", participant_id=2, is_home=False),
         ]
         db.add_all(participantes_futbol)
 
@@ -51,13 +47,7 @@ def seed_events():
             sport_id=tenis.id,
             start_time=ayer,
             status="finished",
-            result_details={
-                "sets": [
-                    {"player_1": 6, "player_2": 4},
-                    {"player_1": 7, "player_2": 5}
-                ],
-                "winner_id": 3
-            }
+            result_details={"sets": [{"player_1": 6, "player_2": 4}, {"player_1": 7, "player_2": 5}], "winner_id": 3},
         )
         db.add(evento_tenis)
         db.commit()
@@ -65,7 +55,7 @@ def seed_events():
 
         participantes_tenis = [
             EventParticipant(event_id=evento_tenis.id, participant_type="player", participant_id=3, is_home=True),
-            EventParticipant(event_id=evento_tenis.id, participant_type="player", participant_id=4, is_home=False)
+            EventParticipant(event_id=evento_tenis.id, participant_type="player", participant_id=4, is_home=False),
         ]
         db.add_all(participantes_tenis)
 
@@ -77,6 +67,7 @@ def seed_events():
         print(f"❌ Error al insertar eventos: {e}")
     finally:
         db.close()
+
 
 if __name__ == "__main__":
     seed_events()

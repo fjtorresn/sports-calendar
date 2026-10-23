@@ -1,12 +1,11 @@
-from src.app.core.database import SessionLocal
-from src.app.models.sports import Nation, Sport, Competition, Team, Player
-from src.app.models.event import Event, EventParticipant
-from src.app.models.user import User, UserPreference
+from app.core.database import SessionLocal
+from app.models.sports import Nation, Sport
+
 
 def seed_data():
     # Abrimos una sesión con la base de datos
     db = SessionLocal()
-    
+
     try:
         # Verificamos si ya hay naciones para no duplicar datos si corres el script 2 veces
         if db.query(Nation).first():
@@ -21,7 +20,7 @@ def seed_data():
             Nation(name="Argentina", iso_code="ARG", flag_url="https://flagcdn.com/w320/ar.png"),
             Nation(name="España", iso_code="ESP", flag_url="https://flagcdn.com/w320/es.png"),
             Nation(name="México", iso_code="MEX", flag_url="https://flagcdn.com/w320/mx.png"),
-            Nation(name="Inglaterra", iso_code="ENG", flag_url="https://flagcdn.com/w320/gb-eng.png")
+            Nation(name="Inglaterra", iso_code="ENG", flag_url="https://flagcdn.com/w320/gb-eng.png"),
         ]
         db.add_all(nations)
 
@@ -29,7 +28,7 @@ def seed_data():
         sports = [
             Sport(name="Fútbol", participant_type="team"),
             Sport(name="Tenis", participant_type="player"),
-            Sport(name="Fórmula 1", participant_type="mixed")
+            Sport(name="Fórmula 1", participant_type="mixed"),
         ]
         db.add_all(sports)
 
@@ -44,6 +43,7 @@ def seed_data():
     finally:
         # Siempre cerramos la conexión al terminar
         db.close()
+
 
 if __name__ == "__main__":
     seed_data()
