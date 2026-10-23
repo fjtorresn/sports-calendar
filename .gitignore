@@ -1,0 +1,7 @@
+# Reglas comunes a todo el monorepo. Cada subproyecto tiene además su propio .gitignore.
+.env
+.env.*
+!.env.example
+.DS_Store
+.vscode/
+.idea/
