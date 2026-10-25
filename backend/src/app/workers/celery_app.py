@@ -1,6 +1,6 @@
-"""Aplicación de Celery.
+"""Celery application.
 
-Por ahora solo existe para que el worker arranque; las tareas de ingesta llegan en la fase 3.
+For now it only exists so the worker starts; ingestion tasks arrive in phase 3.
 """
 
 from celery import Celery
@@ -12,6 +12,6 @@ settings = get_settings()
 celery_app = Celery("sports_calendar", broker=settings.redis_url, backend=settings.redis_url)
 celery_app.conf.update(
     timezone="UTC",
-    task_acks_late=True,  # si un worker muere a mitad de una tarea, otra la retoma
+    task_acks_late=True,  # if a worker dies mid-task, another one picks it up
     worker_prefetch_multiplier=1,
 )

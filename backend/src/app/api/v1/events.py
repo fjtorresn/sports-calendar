@@ -12,24 +12,17 @@ router = APIRouter()
 
 @router.get("/", response_model=list[EventResponse])
 def get_events(
-    # Filtros opcionales en la URL (Query Params)
-    start_date: datetime | None = Query(None, description="Fecha inicio (ISO 8601 UTC)"),
-    end_date: datetime | None = Query(None, description="Fecha fin (ISO 8601 UTC)"),
+    start_date: datetime | None = Query(None, description="Start of the range (ISO 8601, UTC)"),
+    end_date: datetime | None = Query(None, description="End of the range (ISO 8601, UTC)"),
     db: Session = Depends(get_db),
 ):
-    # Iniciamos la consulta base
     query = db.query(Event)
 
-    # Aplicamos filtros dinámicamente si el usuario los envió
     if start_date:
         query = query.filter(Event.start_time >= start_date)
     if end_date:
         query = query.filter(Event.start_time <= end_date)
 
-    # Ordenamos por fecha de inicio (los más próximos primero)
     query = query.order_by(Event.start_time.asc())
 
-    # Ejecutamos la búsqueda en la BD
-    events = query.all()
-
-    return events
+    return query.all()

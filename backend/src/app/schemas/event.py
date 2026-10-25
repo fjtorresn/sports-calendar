@@ -34,7 +34,7 @@ class EventResponse(EventBase):
     id: int
     created_by_user_id: int | None = None
 
-    # Anidamos los participantes para que el frontend reciba todo en un solo JSON
+    # Participants are nested so clients get the whole event in a single response.
     participants: list[EventParticipantResponse] = []
 
     model_config = ConfigDict(from_attributes=True)

@@ -1,6 +1,6 @@
 FROM python:3.13-slim
 
-# uv se copia desde su imagen oficial (versión fijada para builds reproducibles).
+# Copy uv from its official image (pinned for reproducible builds).
 COPY --from=ghcr.io/astral-sh/uv:0.13 /uv /uvx /bin/
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -12,15 +12,15 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-# 1) Solo dependencias: esta capa se reutiliza mientras pyproject.toml/uv.lock no cambien.
+# 1) Dependencies only: this layer is cached until pyproject.toml/uv.lock change.
 COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-dev --no-install-project
 
-# 2) El código del proyecto.
+# 2) The project code.
 COPY . .
 RUN uv sync --frozen --no-dev
 
-# No correr como root dentro del contenedor.
+# Don't run as root inside the container.
 RUN useradd --create-home --uid 1000 appuser
 USER appuser
 

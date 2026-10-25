@@ -1,6 +1,6 @@
-# Se ejecuta en cada `git commit`. Instalar una vez con:
+# Runs on every `git commit`. Install once with:
 #   cd backend && uv run pre-commit install
-# Actualizar versiones: uv run pre-commit autoupdate
+# Update hook versions: uv run pre-commit autoupdate
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0

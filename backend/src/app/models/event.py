@@ -17,10 +17,9 @@ class Event(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
 
-    # Llave foránea directa al deporte (Obligatoria para todo evento)
     sport_id: Mapped[int] = mapped_column(ForeignKey("sports.id", ondelete="CASCADE"), index=True)
 
-    # Opcional, ya que los eventos de usuarios no tendrán competición
+    # Optional: user-created events have no competition.
     competition_id: Mapped[int | None] = mapped_column(
         ForeignKey("competitions.id", ondelete="CASCADE"), nullable=True
     )

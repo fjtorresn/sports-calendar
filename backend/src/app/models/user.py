@@ -19,7 +19,6 @@ class User(Base):
 
     # Relaciones
     own_events: Mapped[list["Event"]] = relationship(back_populates="creator")
-    # Actualizamos el nombre de la relación a 'subscriptions'
     subscriptions: Mapped[list["UserSubscription"]] = relationship(back_populates="user", cascade="all, delete-orphan")
 
 
@@ -41,7 +40,7 @@ class UserSubscription(Base):
     # Relaciones
     user: Mapped["User"] = relationship(back_populates="subscriptions")
 
-    # Restricción a nivel de base de datos
+    # Enforced by the database, not just the API: a subscription needs at least one filter.
     __table_args__ = (
         CheckConstraint(
             "sport_id IS NOT NULL OR competition_id IS NOT NULL OR team_id IS NOT NULL "

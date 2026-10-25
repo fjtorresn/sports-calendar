@@ -1,8 +1,8 @@
-"""Configuración de la aplicación.
+"""Application settings.
 
-Los valores se leen de variables de entorno (y de un archivo ``.env`` en desarrollo).
-No hay valores por defecto para secretos: si falta uno, la app falla al arrancar en vez
-de conectarse a algo inesperado.
+Values are read from environment variables (and from a ``.env`` file in development).
+Secrets have no defaults: if one is missing the app fails at startup instead of
+silently connecting to something unexpected.
 """
 
 from functools import lru_cache
@@ -13,7 +13,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        # El .env vive en la raíz del monorepo; también se busca en el directorio actual.
+        # The .env lives at the monorepo root; the current directory is checked too.
         env_file=("../.env", ".env"),
         env_file_encoding="utf-8",
         extra="ignore",
@@ -26,5 +26,5 @@ class Settings(BaseSettings):
 
 @lru_cache
 def get_settings() -> Settings:
-    """Devuelve la configuración, leída una sola vez por proceso."""
+    """Return the settings, read once per process."""
     return Settings()

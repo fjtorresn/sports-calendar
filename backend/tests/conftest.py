@@ -16,7 +16,7 @@ def client() -> Iterator[TestClient]:
 
 @pytest.fixture
 def db() -> Iterator[Session]:
-    """Sesión contra la base de datos de pruebas; todo lo que haga el test se revierte."""
+    """Session against the test database; everything the test does is rolled back."""
     session = SessionLocal()
     try:
         yield session

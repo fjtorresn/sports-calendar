@@ -1,4 +1,4 @@
-# Reglas comunes a todo el monorepo. Cada subproyecto tiene además su propio .gitignore.
+# Rules shared by the whole monorepo. Each subproject also has its own .gitignore.
 .env
 .env.*
 !.env.example

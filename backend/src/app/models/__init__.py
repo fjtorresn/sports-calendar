@@ -1,8 +1,8 @@
-"""Registro de modelos.
+"""Model registry.
 
-Importar todos los modelos aquí garantiza que SQLAlchemy los conozca a todos
-(relaciones por nombre como ``"User"``) y que ``Base.metadata`` esté completo para Alembic,
-sin importar qué módulo de ``app.models`` se importe primero.
+Importing every model here guarantees that SQLAlchemy knows all of them (relationships
+referenced by name, such as ``"User"``) and that ``Base.metadata`` is complete for Alembic,
+regardless of which ``app.models`` module is imported first.
 """
 
 from app.models.event import Event, EventParticipant

@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 
 
 def test_database_is_reachable(db: Session) -> None:
-    """Verifica que los tests corren contra un PostgreSQL real (RNF-8)."""
+    """Tests must run against a real PostgreSQL (NFR-8)."""
     assert db.execute(text("SELECT 1")).scalar_one() == 1
 
 

@@ -7,7 +7,7 @@ on:
     branches: [main]
     paths: ["backend/**", ".github/workflows/backend.yml"]
 
-# Si llega un push nuevo a la misma rama, se cancela la ejecución anterior.
+# A new push to the same branch cancels the previous run.
 concurrency:
   group: backend-${{ github.ref }}
   cancel-in-progress: true
@@ -21,7 +21,7 @@ jobs:
     runs-on: ubuntu-latest
 
     services:
-      # PostgreSQL real: el modelo usa funciones propias de Postgres y los tests deben verlas (RNF-8).
+      # Real PostgreSQL: the models use Postgres-specific features and tests must exercise them (NFR-8).
       postgres:
         image: postgres:17-alpine
         env:
