@@ -1,6 +1,6 @@
 # Sports Calendar — Design Document
 
-> Status: **draft** · Last updated: 2026-10-24
+> Status: **draft** · Last updated: 2026-10-25
 
 This document describes what we are building, why, and how. Individual decisions
 are recorded as ADRs in [`docs/adr/`](adr/):
@@ -237,22 +237,31 @@ The whole system (web calendar, app and iCal feed) depends on this query, so it
 has to be designed, and indexed, from the start:
 
 ```sql
-SELECT DISTINCT e.*
+SELECT e.*
 FROM events e
-JOIN subscriptions s ON s.user_id = :user_id
-WHERE e.start_time BETWEEN :from AND :to
-  AND (s.sport_id       IS NULL OR e.sport_id       = s.sport_id)
-  AND (s.competition_id IS NULL OR e.competition_id = s.competition_id)
-  AND (s.competitor_id  IS NULL OR EXISTS (
-        SELECT 1 FROM event_participants p
-        WHERE p.event_id = e.id AND p.competitor_id = s.competitor_id))
-  AND (s.nation_id      IS NULL OR EXISTS (
-        SELECT 1 FROM event_participants p JOIN competitors c ON c.id = p.competitor_id
-        WHERE p.event_id = e.id AND c.nation_id = s.nation_id))
-  AND (NOT EXISTS (SELECT 1 FROM subscription_event_kinds k WHERE k.subscription_id = s.id)
-       OR e.event_kind_id IN (SELECT k.event_kind_id FROM subscription_event_kinds k
-                              WHERE k.subscription_id = s.id));
+WHERE e.start_time >= :start AND e.start_time < :end
+  AND EXISTS (
+    SELECT 1 FROM subscriptions s
+    WHERE s.user_id = :user_id
+      AND (s.sport_id       IS NULL OR s.sport_id       = e.sport_id)
+      AND (s.competition_id IS NULL OR s.competition_id = e.competition_id)
+      AND (s.competitor_id  IS NULL OR EXISTS (
+            SELECT 1 FROM event_participants p
+            WHERE p.event_id = e.id AND p.competitor_id = s.competitor_id))
+      AND (s.nation_id      IS NULL OR EXISTS (
+            SELECT 1 FROM event_participants p JOIN competitors c ON c.id = p.competitor_id
+            WHERE p.event_id = e.id AND c.nation_id = s.nation_id))
+      AND (NOT EXISTS (SELECT 1 FROM subscription_event_kinds k WHERE k.subscription_id = s.id)
+           OR EXISTS (SELECT 1 FROM subscription_event_kinds k
+                      WHERE k.subscription_id = s.id AND k.event_kind_id = e.event_kind_id)))
+ORDER BY e.start_time;
 ```
+
+`EXISTS` is a **semi-join**: an event matched by several subscriptions is returned once,
+with no `DISTINCT` (an earlier draft used `JOIN subscriptions … SELECT DISTINCT`, which
+builds every event × subscription pair and then deduplicates). The range is half-open
+(`[start, end)`), so consecutive windows never overlap. Implemented in
+`app/services/calendar.py`, with the semantics pinned down by `tests/test_calendar_query.py`.
 
 Initial indexes: `events (competition_id, start_time)`, `events (sport_id, start_time)`,
 `event_participants (competitor_id, event_id)` and `subscriptions (user_id)`.
@@ -407,9 +416,9 @@ when the metrics call for it:
 |---|---|---|
 | **0. Foundation** | Move CI to `.github/workflows/` with a PostgreSQL service; `pydantic-settings` and secrets in `.env`; `docker-compose` at the root; README; `CLAUDE.md`; pre-commit with Ruff | NFR-7, NFR-8 |
 | **1. Design** | This document and the ADRs | — |
-| **2. Model v2** | SQLAlchemy models and **a fresh initial migration** (there is no production data, so resetting the migration history is cleaner than chaining changes); catalog seed | §4 |
+| **2. Model v2** | SQLAlchemy models and **a fresh initial migration** (there is no production data, so resetting the migration history is cleaner than chaining changes); catalog seed; the **core calendar query** (§4.4), so the model is validated against its real use | §4, FR-2, FR-3 |
 | **3. Ingestion** | `EventProvider` interface; football-data and Jolpica adapters; `sync_state`, locks and quota; Celery Beat; tests with recorded responses (fixtures) | FR-5, FR-6, NFR-1–3, NFR-6 |
-| **4. Users and calendar** | Authentication; subscription CRUD; calendar endpoint; iCal feed; sync on subscribe | FR-1–4, FR-7, FR-8, NFR-5 |
+| **4. Users and calendar** | Authentication; subscription CRUD; calendar endpoint (exposes the query from phase 2); iCal feed; sync on subscribe | FR-1–4, FR-7, FR-8, NFR-5 |
 | **5. Web** | Client generated from OpenAPI (`packages/api-client`); UI to create subscriptions and view the calendar | — |
 | **6. Deployment** | Hosting, managed database, logs and metrics, alerts (e.g. "an adapter returned 0 events") | NFR-4 |
 | **Post-MVP** | Following players (§4.6), tennis, basketball, NFL, MMA, boxing (scraping), mobile app, user-created events, adaptive frequency | — |
