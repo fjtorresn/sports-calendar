@@ -27,6 +27,11 @@ services:
     <<: *backend
     command: celery -A app.workers.celery_app worker --loglevel=info
 
+  # Enqueues scheduled tasks (the daily sync). Run exactly one, or tasks get enqueued twice.
+  beat:
+    <<: *backend
+    command: celery -A app.workers.celery_app beat --loglevel=info --schedule /tmp/celerybeat-schedule
+
   db:
     image: postgres:17-alpine
     environment:
