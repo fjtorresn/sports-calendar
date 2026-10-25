@@ -1,7 +1,6 @@
 # Sports Calendar
 
-[![Backend](https://github.com/fjtorresn/sports-calendar/actions/workflows/backend.yml/badge.svg)](https://github.com/fjtorresn/sports-calendar/actions/workflows/backend.yml)
-[![Frontend](https://github.com/fjtorresn/sports-calendar/actions/workflows/frontend.yml/badge.svg)](https://github.com/fjtorresn/sports-calendar/actions/workflows/frontend.yml)
+[![CI](https://github.com/fjtorresn/sports-calendar/actions/workflows/ci.yml/badge.svg)](https://github.com/fjtorresn/sports-calendar/actions/workflows/ci.yml)
 
 A personalized sports calendar. Each user defines **subscriptions**, such as
 *Football – FC Barcelona – Champions League* or *F1 – qualifying and race only*,
