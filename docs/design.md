@@ -11,6 +11,7 @@ are recorded as ADRs in [`docs/adr/`](adr/):
 | [0002](adr/0002-data-sources-and-adapters.md) | Multiple data sources behind a common interface |
 | [0003](adr/0003-unified-competitors.md) | A single `competitors` table for teams and individuals |
 | [0004](adr/0004-ical-feed.md) | iCal feed with a private token and TTL caching |
+| [0005](adr/0005-string-enums-with-check-constraints.md) | Fixed-value columns as VARCHAR + CHECK, not native ENUM |
 
 ---
 

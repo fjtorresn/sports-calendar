@@ -68,6 +68,7 @@ docker compose up -d db redis
 cd backend
 uv sync                        # installs Python 3.13 and the dependencies
 uv run alembic upgrade head    # applies migrations
+uv run python -m app.scripts.seed  # loads the MVP catalog (idempotent)
 uv run uvicorn app.api.main:app --reload
 ```
 
@@ -90,9 +91,9 @@ cd frontend && npm install && npm run dev
 
 | Phase | Status |
 |---|---|
-| 0. Foundation (CI, settings, local environment) | 🔄 In progress |
+| 0. Foundation (CI, settings, local environment) | ✅ |
 | 1. Design | ✅ |
-| 2. Data model v2 | ⏳ |
+| 2. Data model v2 and core calendar query | 🔄 In progress |
 | 3. Ingestion (football-data.org, Jolpica F1) | ⏳ |
 | 4. Users, subscriptions, calendar and iCal feed | ⏳ |
 | 5. Web | ⏳ |
