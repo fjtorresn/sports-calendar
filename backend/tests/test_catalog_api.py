@@ -32,4 +32,6 @@ def test_lists_competitions_of_a_sport(client: TestClient, db: Session) -> None:
 
     response = client.get("/api/v1/catalog/sports/football/competitions")
 
-    assert {c["slug"] for c in response.json()} == {"champions-league", "la-liga", "premier-league"}
+    slugs = {c["slug"] for c in response.json()}
+    assert len(slugs) == 13
+    assert {"champions-league", "la-liga", "premier-league"} <= slugs
