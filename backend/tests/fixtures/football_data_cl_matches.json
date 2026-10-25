@@ -1,0 +1,141 @@
+{
+  "competition": {
+    "id": 2001,
+    "code": "CL",
+    "name": "UEFA Champions League"
+  },
+  "matches": [
+    {
+      "id": 575323,
+      "utcDate": "2026-09-08T16:45:00Z",
+      "status": "FINISHED",
+      "stage": "LEAGUE_STAGE",
+      "matchday": 1,
+      "lastUpdated": "2026-10-25T00:20:24Z",
+      "homeTeam": {
+        "id": 851,
+        "name": "Club Brugge KV",
+        "shortName": "Club Brugge",
+        "tla": "BRU",
+        "crest": "https://crests.football-data.org/851.png"
+      },
+      "awayTeam": {
+        "id": 58,
+        "name": "Aston Villa FC",
+        "shortName": "Aston Villa",
+        "tla": "AVL",
+        "crest": "https://crests.football-data.org/58.png"
+      }
+    },
+    {
+      "id": 575377,
+      "utcDate": "2026-11-03T17:45:00Z",
+      "status": "TIMED",
+      "stage": "LEAGUE_STAGE",
+      "matchday": 4,
+      "lastUpdated": "2026-10-25T00:20:24Z",
+      "homeTeam": {
+        "id": 1887,
+        "name": "FK Shakhtar Donetsk",
+        "shortName": "Shaktar",
+        "tla": "SHD",
+        "crest": "https://crests.football-data.org/1887.png"
+      },
+      "awayTeam": {
+        "id": 498,
+        "name": "Sporting Clube de Portugal",
+        "shortName": "Sporting CP",
+        "tla": "SPO",
+        "crest": "https://crests.football-data.org/498.png"
+      }
+    },
+    {
+      "id": 575378,
+      "utcDate": "2026-11-03T17:45:00Z",
+      "status": "TIMED",
+      "stage": "LEAGUE_STAGE",
+      "matchday": 4,
+      "lastUpdated": "2026-10-25T00:20:24Z",
+      "homeTeam": {
+        "id": 610,
+        "name": "Galatasaray SK",
+        "shortName": "Galatasaray",
+        "tla": "GAL",
+        "crest": "https://crests.football-data.org/610.png"
+      },
+      "awayTeam": {
+        "id": 10,
+        "name": "VfB Stuttgart",
+        "shortName": "Stuttgart",
+        "tla": "VFB",
+        "crest": "https://crests.football-data.org/10.png"
+      }
+    },
+    {
+      "id": 900001,
+      "utcDate": "2026-12-09T00:00:00Z",
+      "status": "SCHEDULED",
+      "stage": "LEAGUE_STAGE",
+      "matchday": 4,
+      "lastUpdated": "2026-10-25T00:20:24Z",
+      "homeTeam": {
+        "id": 1887,
+        "name": "FK Shakhtar Donetsk",
+        "shortName": "Shaktar",
+        "tla": "SHD",
+        "crest": "https://crests.football-data.org/1887.png"
+      },
+      "awayTeam": {
+        "id": 498,
+        "name": "Sporting Clube de Portugal",
+        "shortName": "Sporting CP",
+        "tla": "SPO",
+        "crest": "https://crests.football-data.org/498.png"
+      }
+    },
+    {
+      "id": 900002,
+      "utcDate": "2026-11-03T17:45:00Z",
+      "status": "POSTPONED",
+      "stage": "LEAGUE_STAGE",
+      "matchday": 4,
+      "lastUpdated": "2026-10-25T00:20:24Z",
+      "homeTeam": {
+        "id": 610,
+        "name": "Galatasaray SK",
+        "shortName": "Galatasaray",
+        "tla": "GAL",
+        "crest": "https://crests.football-data.org/610.png"
+      },
+      "awayTeam": {
+        "id": 10,
+        "name": "VfB Stuttgart",
+        "shortName": "Stuttgart",
+        "tla": "VFB",
+        "crest": "https://crests.football-data.org/10.png"
+      }
+    },
+    {
+      "id": 900003,
+      "utcDate": "2026-11-03T17:45:00Z",
+      "status": "TIMED",
+      "stage": "LAST_16",
+      "matchday": 4,
+      "lastUpdated": "2026-10-25T00:20:24Z",
+      "homeTeam": {
+        "id": null,
+        "name": null,
+        "shortName": null,
+        "tla": null,
+        "crest": null
+      },
+      "awayTeam": {
+        "id": 10,
+        "name": "VfB Stuttgart",
+        "shortName": "Stuttgart",
+        "tla": "VFB",
+        "crest": "https://crests.football-data.org/10.png"
+      }
+    }
+  ]
+}
