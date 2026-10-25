@@ -45,6 +45,10 @@ extend-exclude = ["alembic/versions"]
 # B: bug-prone patterns (flake8-bugbear)
 select = ["E", "W", "F", "I", "UP", "B"]
 
+[tool.ruff.lint.isort]
+# `backend/alembic/` holds our migrations; the `alembic` import is still the third-party library.
+known-third-party = ["alembic"]
+
 [tool.ruff.lint.per-file-ignores]
 # FastAPI uses `Depends(...)` and `Query(...)` as default values: that's the framework's pattern.
 "src/app/api/**" = ["B008"]
@@ -53,3 +57,5 @@ select = ["E", "W", "F", "I", "UP", "B"]
 minversion = "8.0"
 addopts = "-v"
 testpaths = ["tests"]
+# A new deprecation or ORM warning fails the suite instead of going unnoticed.
+filterwarnings = ["error"]

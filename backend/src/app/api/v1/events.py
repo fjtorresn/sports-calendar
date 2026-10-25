@@ -1,28 +1,33 @@
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy.orm import Session
+from sqlalchemy import select
+from sqlalchemy.orm import Session, selectinload
 
 from app.core.database import get_db
-from app.models.event import Event
+from app.models import Event, EventParticipant
 from app.schemas.event import EventResponse
 
 router = APIRouter()
 
 
 @router.get("/", response_model=list[EventResponse])
-def get_events(
-    start_date: datetime | None = Query(None, description="Start of the range (ISO 8601, UTC)"),
-    end_date: datetime | None = Query(None, description="End of the range (ISO 8601, UTC)"),
+def list_events(
+    start: datetime | None = Query(None, description="Start of the range (ISO 8601, UTC)"),
+    end: datetime | None = Query(None, description="End of the range (ISO 8601, UTC)"),
     db: Session = Depends(get_db),
-):
-    query = db.query(Event)
-
-    if start_date:
-        query = query.filter(Event.start_time >= start_date)
-    if end_date:
-        query = query.filter(Event.start_time <= end_date)
-
-    query = query.order_by(Event.start_time.asc())
-
-    return query.all()
+) -> list[Event]:
+    query = (
+        select(Event)
+        .options(
+            selectinload(Event.competition),
+            selectinload(Event.event_kind),
+            selectinload(Event.participants).selectinload(EventParticipant.competitor),
+        )
+        .order_by(Event.start_time)
+    )
+    if start:
+        query = query.where(Event.start_time >= start)
+    if end:
+        query = query.where(Event.start_time <= end)
+    return list(db.scalars(query))
