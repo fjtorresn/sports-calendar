@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 
+from app.api import calendar
 from app.api.v1.router import api_router
 
 app = FastAPI(title="Sports Calendar API", description="Personalized sports calendar backend", version="1.0.0")
@@ -11,3 +12,4 @@ def health_check():
 
 
 app.include_router(api_router, prefix="/api/v1")
+app.include_router(calendar.router)

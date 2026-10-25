@@ -10,6 +10,7 @@ from sqlalchemy.engine import URL, make_url
 from sqlalchemy.orm import Session
 
 from app.api.main import app
+from app.core.cache import get_cache
 from app.core.config import get_settings
 from app.core.database import get_db
 
@@ -65,9 +66,28 @@ def db(engine: Engine) -> Iterator[Session]:
             transaction.rollback()
 
 
+class MemoryCache:
+    """Stands in for Redis in tests (TTL ignored)."""
+
+    def __init__(self) -> None:
+        self.data: dict[str, bytes] = {}
+
+    def get(self, key: str) -> bytes | None:
+        return self.data.get(key)
+
+    def set(self, key: str, value: bytes, ttl_seconds: int) -> None:
+        self.data[key] = value
+
+
 @pytest.fixture
-def client(db: Session) -> Iterator[TestClient]:
+def cache() -> MemoryCache:
+    return MemoryCache()
+
+
+@pytest.fixture
+def client(db: Session, cache: MemoryCache) -> Iterator[TestClient]:
     app.dependency_overrides[get_db] = lambda: db
+    app.dependency_overrides[get_cache] = lambda: cache
     try:
         with TestClient(app) as c:
             yield c

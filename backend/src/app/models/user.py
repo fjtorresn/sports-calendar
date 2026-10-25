@@ -16,7 +16,8 @@ class User(TimestampMixin, Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     email: Mapped[str] = mapped_column(String(255), unique=True)
-    hashed_password: Mapped[str] = mapped_column(String(255))
+    # NULL until sign-up exists (phase 4); MVP users are created from the CLI.
+    hashed_password: Mapped[str | None] = mapped_column(String(255))
     # IANA name (e.g. "America/Santiago"); events are stored in UTC and converted for display.
     timezone: Mapped[str] = mapped_column(String(64), default="UTC", server_default="UTC")
     # The secret in the private iCal URL (ADR 0004). Regenerating it revokes the old URL.
