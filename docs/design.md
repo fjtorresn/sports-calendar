@@ -1,188 +1,185 @@
-# Sports Calendar — Documento de diseño
+# Sports Calendar — Design Document
 
-> Estado: **borrador** · Última actualización: 2026-10-21
+> Status: **draft** · Last updated: 2026-10-24
 
-Este documento describe qué construimos, por qué y cómo. Las decisiones puntuales
-se registran como ADRs en [`docs/adr/`](adr/):
+This document describes what we are building, why, and how. Individual decisions
+are recorded as ADRs in [`docs/adr/`](adr/):
 
-| ADR | Decisión |
+| ADR | Decision |
 |---|---|
-| [0001](adr/0001-monorepo.md) | Monorepo para backend, web y mobile |
-| [0002](adr/0002-fuentes-de-datos-y-adaptadores.md) | Varias fuentes de datos detrás de una interfaz común |
-| [0003](adr/0003-competitors-unificados.md) | Una sola tabla `competitors` para equipos e individuos |
-| [0004](adr/0004-feed-ical.md) | Feed iCal con token privado y caché por TTL |
+| [0001](adr/0001-monorepo.md) | Monorepo for backend, web and mobile |
+| [0002](adr/0002-data-sources-and-adapters.md) | Multiple data sources behind a common interface |
+| [0003](adr/0003-unified-competitors.md) | A single `competitors` table for teams and individuals |
+| [0004](adr/0004-ical-feed.md) | iCal feed with a private token and TTL caching |
 
 ---
 
-## 1. Problema y objetivo
+## 1. Problem and goal
 
-Seguir varios deportes a la vez hace fácil perderse partidos o competiciones.
-Sports Calendar permite que cada usuario defina **suscripciones** (por ejemplo,
-*Fútbol – FC Barcelona – Champions League* o *Tenis – Novak Djokovic*) y obtenga
-un **calendario personalizado** con todos los eventos que coinciden, visible en la
-web, en la app móvil y en su calendario habitual (Google / Apple) vía feed iCal.
+Following several sports at once makes it easy to miss matches or competitions.
+Sports Calendar lets each user define **subscriptions** (for example,
+*Football – FC Barcelona – Champions League* or *Tennis – Novak Djokovic*) and get
+a **personalized calendar** with every matching event, available on the web, in the
+mobile app, and in their usual calendar (Google / Apple) through an iCal feed.
 
-## 2. Requisitos
+## 2. Requirements
 
-### 2.1 Funcionales
+### 2.1 Functional
 
-| ID | Requisito |
+| ID | Requirement |
 |---|---|
-| RF-1 | El usuario se registra e inicia sesión. |
-| RF-2 | El usuario crea, lista y elimina **suscripciones**. Cada una combina uno o más filtros (deporte, competición, equipo, jugador, nación) que se unen con **Y**. Ejemplo: *equipo = Barcelona* **y** *competición = Champions*. |
-| RF-3 | El calendario del usuario contiene los eventos que cumplen **al menos una** de sus suscripciones (las suscripciones se unen con **O**). |
-| RF-4 | Cada evento muestra **fecha, hora** (en la zona horaria del usuario), participantes y competición. |
-| RF-5 | Solo aparecen eventos **confirmados**. En los torneos por eliminación (tenis, playoffs) se muestra el próximo partido de un participante recién cuando está definido: si Djokovic gana su primer partido en Shanghái, el siguiente aparece cuando se conozca la fecha y la hora. |
-| RF-6 | Los eventos que se postergan o cancelan se actualizan o se marcan; no quedan con datos viejos. |
-| RF-7 | El usuario obtiene una **URL iCal privada** para suscribirse desde Google Calendar o Apple Calendar, y puede regenerarla. |
-| RF-8 | Al crear una suscripción nueva, sus eventos aparecen sin esperar a la sincronización diaria (ver RNF-2). |
+| FR-1 | Users can sign up and log in. |
+| FR-2 | Users can create, list and delete **subscriptions**. Each one combines one or more filters (sport, competition, team, player, nation) joined with **AND**. Example: *team = Barcelona* **and** *competition = Champions League*. |
+| FR-3 | A user's calendar contains the events that match **at least one** of their subscriptions (subscriptions are joined with **OR**). |
+| FR-4 | Each event shows its **date and time** (in the user's time zone), participants and competition. |
+| FR-5 | Only **confirmed** events are shown. In knockout tournaments (tennis, playoffs), a participant's next match appears only once it is set: if Djokovic wins his first match in Shanghai, the next one appears when its date and time are known. |
+| FR-6 | Postponed or cancelled events are updated or flagged; they never keep stale data. |
+| FR-7 | Users get a **private iCal URL** to subscribe from Google Calendar or Apple Calendar, and can regenerate it. |
+| FR-8 | When a user creates a new subscription, its events appear without waiting for the daily sync (see NFR-2). |
 
-### 2.2 No funcionales
+### 2.2 Non-functional
 
-| ID | Requisito | Objetivo |
+| ID | Requirement | Target |
 |---|---|---|
-| RNF-1 | **Frescura de los datos** | Sincronización **diaria** de las competiciones que sigue al menos un usuario. |
-| RNF-2 | **Sincronización al suscribirse** | Si la competición nunca se sincronizó, o lleva más de 24 h sin sincronizar, se lanza una tarea en segundo plano. Si se sincronizó hace poco, no se repite, para no gastar cuota. |
-| RNF-3 | **Presupuesto de cuota** | No pasar el límite gratuito de cada fuente (≈100 req/día en API-Sports, 10 req/min en football-data). La ingesta lleva la cuenta de lo que consume. |
-| RNF-4 | **Escala objetivo** | 1000 usuarios con la infraestructura mínima (ver §6), y un camino claro para crecer 100 veces sin rediseñar. |
-| RNF-5 | **Rendimiento** | Calendario web y feed iCal en p95 < 300 ms. |
-| RNF-6 | **Extensibilidad** | Agregar un deporte o una fuente nueva = escribir un adaptador nuevo, sin cambiar la API ni el modelo central. |
-| RNF-7 | **Seguridad** | Contraseñas con hash, secretos solo en variables de entorno, token iCal largo y aleatorio que se puede revocar. |
-| RNF-8 | **Calidad** | CI con lint y tests en cada PR; los tests de la base de datos corren contra PostgreSQL real. |
+| NFR-1 | **Data freshness** | **Daily** sync of every competition followed by at least one user. |
+| NFR-2 | **Sync on subscribe** | If the competition has never been synced, or was last synced more than 24 h ago, a background task is queued. If it was synced recently, it is skipped to save quota. |
+| NFR-3 | **Quota budget** | Never exceed each source's free limit (≈100 req/day on API-Sports, 10 req/min on football-data). Ingestion tracks its own usage. |
+| NFR-4 | **Target scale** | 1,000 users on minimal infrastructure (see §6), with a clear path to 100× growth without a redesign. |
+| NFR-5 | **Performance** | Web calendar and iCal feed at p95 < 300 ms. |
+| NFR-6 | **Extensibility** | Adding a sport or a source = writing a new adapter, without changing the API or the core model. |
+| NFR-7 | **Security** | Hashed passwords, secrets only in environment variables, long random iCal token that can be revoked. |
+| NFR-8 | **Quality** | CI with lint and tests on every PR; database tests run against a real PostgreSQL. |
 
-### 2.3 Fuera de alcance (por ahora)
+### 2.3 Out of scope (for now)
 
-- Resultados, marcadores y estadísticas. El modelo no debe impedir agregarlos después.
-- Resultados en vivo y notificaciones push.
-- Eventos creados por el usuario (está previsto, pero en una fase posterior).
-- Funciones sociales.
+- Results, scores and statistics. The model must not prevent adding them later.
+- Live scores and push notifications.
+- User-created events (planned, but for a later phase).
+- Social features.
 
-### 2.4 Alcance del MVP
+### 2.4 MVP scope
 
-**Fútbol + Fórmula 1.** Son los deportes con las mejores fuentes (football-data.org
-y Jolpica) y cubren los dos tipos de suscripción más comunes: por **equipo**
-(Barcelona en la Champions) y por **competición** (toda la F1).
+**Football + Formula 1.** These sports have the best sources (football-data.org
+and Jolpica) and cover the two most common subscription types: by **team**
+(Barcelona in the Champions League) and by **competition** (all of F1).
 
-### 2.5 Implicaciones de diseño
+### 2.5 Design implications
 
-1. **La hora de un evento no siempre es exacta.** En tenis la programación suele
-   decir *"no antes de las 14:00"* o *"a continuación de"*, y en fútbol la fecha
-   de una jornada a veces se confirma antes que la hora. El modelo necesita
-   `start_time` + una **precisión** (`exact`, `not_before`, `date_only`).
-   En iCal, un evento `date_only` se publica como evento de todo el día.
-2. **Torneos por eliminación (RF-5).** No hace falta lógica especial: un partido
-   aparece cuando la fuente lo publica con sus participantes confirmados. Basta
-   con que el upsert por `external_id` actualice los eventos que ya tenemos.
-3. **Frecuencia adaptativa (después del MVP).** Con sincronizar una vez al día
-   puede pasar que el próximo partido de un tenista aparezca tarde. Más adelante
-   se puede sincronizar más seguido los torneos en curso, gastando cuota solo
-   donde importa.
-4. **Sin resultados ⇒ sin `result_details`.** Se elimina del modelo (no hay que
-   modelar lo que no se usa). Lo que sí se mantiene es `status`
-   (`scheduled`, `postponed`, `cancelled`, `finished`), necesario para RF-6.
+1. **An event's time is not always exact.** Tennis schedules often say
+   *"not before 2:00 pm"* or *"followed by"*, and in football a matchday's date is
+   sometimes confirmed before its kick-off time. The model needs `start_time` plus
+   a **precision** (`exact`, `not_before`, `date_only`). In iCal, a `date_only`
+   event is published as an all-day event.
+2. **Knockout tournaments (FR-5).** No special logic is needed: a match appears
+   when the source publishes it with confirmed participants. The upsert by
+   external ID only has to update the events we already have.
+3. **Adaptive frequency (post-MVP).** With a single daily sync, a tennis player's
+   next match may show up late. Later on, in-progress tournaments can be synced
+   more often, spending quota only where it matters.
+4. **No results ⇒ no `result_details`.** It is removed from the model (don't
+   model what isn't used). `status` stays (`scheduled`, `postponed`, `cancelled`,
+   `finished`), since FR-6 needs it.
 
 ---
 
-## 3. Fuentes de datos
+## 3. Data sources
 
-### 3.1 Deportes en alcance
+### 3.1 Sports in scope
 
-Fútbol, tenis, básquet, Fórmula 1, boxeo, MMA, NFL. La lista crecerá, así que la
-arquitectura debe permitir **agregar un deporte o una fuente sin tocar el resto
-del sistema** (ver §3.4).
+Football, tennis, basketball, Formula 1, boxing, MMA, NFL. The list will grow, so
+the architecture must allow **adding a sport or a source without touching the rest
+of the system** (see §3.4).
 
-### 3.2 Hallazgos de la investigación (oct 2026)
+### 3.2 Research findings (Oct 2026)
 
-> ⚠️ Los planes gratuitos cambian seguido. Todo lo marcado como _"sin verificar"_
-> se confirma con una cuenta y una llamada real antes de escribir el adaptador.
+> ⚠️ Free plans change often. Anything marked _"unverified"_ is confirmed with an
+> account and a real request before writing its adapter.
 
-| Deporte | Candidata principal (gratis) | Alternativa | Observaciones |
+| Sport | Main candidate (free) | Alternative | Notes |
 |---|---|---|---|
-| **Fútbol** | [football-data.org](https://www.football-data.org/pricing) — 12 competiciones gratis (incluye Champions, las 5 grandes ligas y el Mundial), 10 req/min | [API-Football](https://www.api-football.com/news/post/how-to-get-started-with-api-football-the-complete-beginners-guide) (API-Sports) — ~1200 ligas, 100 req/día | El plan gratuito de football-data entrega los datos con retraso; para un calendario no importa. Cobertura de temporadas de API-Football: _sin verificar_ |
-| **F1** | [Jolpica-F1](https://docs.fastf1.dev/api_reference/jolpica.html) — sucesor de Ergast, abierto, 4 req/s y 500 req/h | API-Sports Formula-1 | Es la mejor situación de todas: abierta, estable y con muchos datos |
-| **Básquet** | API-Basketball (API-Sports) — 100 req/día, NBA y ligas internacionales | API de ESPN no oficial | La de ESPN no tiene documentación ni términos de uso: solo como respaldo |
-| **NFL** | API-American-Football (API-Sports) — 100 req/día | API de ESPN no oficial, [TheSportsDB](https://www.thesportsdb.com/pricing) | |
-| **Tenis** | [Live Tennis API](https://duckdb.org/community_extensions/extensions/livetennis) — 100 req/día (_sin verificar_) | API-Tennis, scraping | Es el deporte más difícil de cubrir gratis. Hay que probar la calidad de los datos antes de decidir |
-| **MMA** | [TheSportsDB](https://www.thesportsdb.com/season/4443-ufc/2026&view=1) — UFC, 30 req/min | API-Sports MMA, [UFCalendar](https://www.ufcalendar.com/developers/mma-api) (pago, ~USD 19/mes) | Otras promotoras (PFL, ONE) tienen menos cobertura gratis |
-| **Boxeo** | ❌ No encontramos una API gratuita confiable | Scraping (revisar los términos de uso de cada sitio) | Candidato natural para el primer adaptador de scraping |
-| **Respaldo general** | TheSportsDB — muchos deportes, plan gratuito con resultados limitados | [sporting-events.org](https://sporting-events.org/data/) — descargas CSV/JSON gratuitas, piden atribución | Útil para llenar huecos y para cargar el catálogo inicial |
+| **Football** | [football-data.org](https://www.football-data.org/pricing) — 12 free competitions (Champions League, the top 5 leagues and the World Cup), 10 req/min | [API-Football](https://www.api-football.com/news/post/how-to-get-started-with-api-football-the-complete-beginners-guide) (API-Sports) — ~1,200 leagues, 100 req/day | football-data's free plan delays the data, which doesn't matter for a calendar. API-Football's season coverage: _unverified_ |
+| **F1** | [Jolpica-F1](https://docs.fastf1.dev/api_reference/jolpica.html) — Ergast's successor, open, 4 req/s and 500 req/h | API-Sports Formula-1 | The best situation of all: open, stable and data-rich |
+| **Basketball** | API-Basketball (API-Sports) — 100 req/day, NBA and international leagues | Unofficial ESPN API | ESPN's API has no documentation or terms of use: fallback only |
+| **NFL** | API-American-Football (API-Sports) — 100 req/day | Unofficial ESPN API, [TheSportsDB](https://www.thesportsdb.com/pricing) | |
+| **Tennis** | [Live Tennis API](https://duckdb.org/community_extensions/extensions/livetennis) — 100 req/day (_unverified_) | API-Tennis, scraping | The hardest sport to cover for free. Data quality must be tested before deciding |
+| **MMA** | [TheSportsDB](https://www.thesportsdb.com/season/4443-ufc/2026&view=1) — UFC, 30 req/min | API-Sports MMA, [UFCalendar](https://www.ufcalendar.com/developers/mma-api) (paid, ~USD 19/month) | Other promotions (PFL, ONE) have less free coverage |
+| **Boxing** | ❌ No reliable free API found | Scraping (check each site's terms of use) | Natural candidate for the first scraping adapter |
+| **General fallback** | TheSportsDB — many sports, free plan with limited results | [sporting-events.org](https://sporting-events.org/data/) — free CSV/JSON downloads, attribution required | Useful to fill gaps and to load the initial catalog |
 
-### 3.3 Lo que la investigación implica para el diseño
+### 3.3 What the research means for the design
 
-1. **Ninguna fuente cubre todo.** Vamos a convivir con varias fuentes desde el día
-   uno, así que el patrón *Adapter* (§3.4) no es opcional.
-2. **Las cuotas son pequeñas (≈100 req/día por API).** La ingesta tiene que
-   **cuidar ese presupuesto**:
-   - Los calendarios cambian poco: alcanza con sincronizar 1 a 4 veces al día,
-     y con más frecuencia solo cerca de la fecha del evento.
-   - Pedir los partidos **por competición o temporada**, no uno por uno.
-   - **Ingesta según demanda:** solo se sincronizan las competiciones que al menos
-     un usuario sigue. Así el costo depende del catálogo seguido, no de la cantidad
-     de usuarios.
-3. **La misma entidad llega desde varias fuentes.** "FC Barcelona" en
-   football-data y en API-Football tiene IDs distintos. Hace falta una tabla de
-   mapeo `external_ids (entity_type, entity_id, source, external_id)` en vez de
-   una sola columna `external_id`. Esto es **resolución de entidades**, y se
-   empieza a mano: cuando dos fuentes no coinciden, se mapea manualmente.
-4. **Prioridad entre fuentes.** Si dos fuentes traen el mismo evento, se define
-   por deporte cuál manda (por ejemplo, football-data sobre API-Football para las
-   12 competiciones que cubre).
-5. **Licencias.** Para uso personal, el plan gratuito alcanza. Si la app se vuelve
-   pública, el feed iCal **redistribuye** los datos, y hay que revisar los términos
-   de cada fuente antes de abrirla al público.
+1. **No source covers everything.** We will live with several sources from day
+   one, so the *Adapter* pattern (§3.4) is not optional.
+2. **Quotas are small (≈100 req/day per API).** Ingestion has to **respect that
+   budget**:
+   - Schedules change rarely: syncing 1–4 times a day is enough, and more often
+     only close to the event date.
+   - Fetch matches **per competition or season**, not one by one.
+   - **On-demand ingestion:** only competitions followed by at least one user are
+     synced. Cost then depends on the followed catalog, not on the number of users.
+3. **The same entity arrives from several sources.** "FC Barcelona" has different
+   IDs in football-data and in API-Football, so a single `external_id` column is
+   not enough: we need mapping tables (see §4.5). This is **entity resolution**,
+   and it starts manual: when two sources disagree, the mapping is done by hand.
+4. **Source priority.** If two sources return the same event, each sport defines
+   which one wins (e.g. football-data over API-Football for the 12 competitions it
+   covers).
+5. **Licensing.** For personal use the free plans are enough. If the app goes
+   public, the iCal feed **redistributes** the data, so each source's terms must be
+   reviewed before opening it up.
 
-### 3.4 Patrón de ingesta (borrador)
+### 3.4 Ingestion pattern (draft)
 
 ```
    ┌──────────────────────┐
    │ FootballDataProvider │──┐
    ├──────────────────────┤  │   fetch_events(competition, season)
-   │ JolpicaF1Provider    │──┼──────────────────────────────────►  DTOs normalizados
+   │ JolpicaF1Provider    │──┼──────────────────────────────────►  normalized DTOs
    ├──────────────────────┤  │                                         │
    │ BoxingScraper        │──┘                                         ▼
-   └──────────────────────┘                          resolución de entidades (external_ids)
+   └──────────────────────┘                            entity resolution (*_external_refs)
                                                                        │
                                                                        ▼
-                                                     upsert idempotente  →  PostgreSQL
+                                                     idempotent upsert  →  PostgreSQL
 ```
 
-Cada fuente implementa la misma interfaz (`EventProvider`). El resto del sistema
-(API, calendario, iCal) **no sabe** de qué fuente vino cada evento.
+Every source implements the same interface (`EventProvider`). The rest of the
+system (API, calendar, iCal) **doesn't know** which source an event came from.
 
 ---
 
-## 4. Modelo de datos v2
+## 4. Data model v2
 
-### 4.1 Cambios respecto a v1
+### 4.1 Changes from v1
 
-| v1 | v2 | Por qué |
+| v1 | v2 | Why |
 |---|---|---|
-| `teams` + `players` por separado; `event_participants` polimórfico (`participant_type` + `participant_id` sin FK) | Una sola tabla **`competitors`** (`kind = team \| individual`); `event_participants.competitor_id` con FK real | Integridad referencial; Barcelona, Djokovic, Verstappen y Red Bull son todos "quien compite". Una suscripción apunta a un solo `competitor_id` |
-| — | **`event_kinds`** por deporte (F1: `practice`, `qualifying`, `sprint`, `race`; fútbol: `match`) + **`subscription_event_kinds`** | El usuario elige qué tipos de sesión quiere (RF-2, decisión F1 = opción *d*) |
-| `result_details JSONB` | Se elimina | Fuera de alcance (§2.3) |
-| `status` texto libre | Enum: `scheduled`, `postponed`, `cancelled`, `finished` | RF-6; un valor inválido no llega a la base de datos |
+| Separate `teams` + `players`; polymorphic `event_participants` (`participant_type` + `participant_id` with no FK) | A single **`competitors`** table (`kind = team \| individual`); `event_participants.competitor_id` is a real FK | Referential integrity; Barcelona, Djokovic, Verstappen and Red Bull are all "someone who competes". A subscription points at a single `competitor_id` |
+| — | **`event_kinds`** per sport (F1: `practice`, `qualifying`, `sprint`, `race`; football: `match`) + **`subscription_event_kinds`** | Users choose which session types they want (FR-2) |
+| `result_details JSONB` | Removed | Out of scope (§2.3) |
+| Free-text `status` | Enum: `scheduled`, `postponed`, `cancelled`, `finished` | FR-6; an invalid value never reaches the database |
 | — | `time_precision` (`exact`, `not_before`, `date_only`) | §2.5.1 |
-| — | `parent_event_id` | Agrupar las sesiones de un Gran Premio (y más adelante las rondas de un torneo) |
-| — | Tablas `*_external_refs` | Una entidad puede venir de varias fuentes (§3.3.3) |
-| — | `sync_state` | Saber cuándo se sincronizó cada competición (RNF-1, RNF-2) |
-| `users` sin zona horaria | `timezone`, `ical_token`, `created_at` | RF-4, RF-7 |
+| — | `parent_event_id` | Groups the sessions of a Grand Prix (and later the rounds of a tournament) |
+| — | `*_external_refs` tables | An entity can come from several sources (§3.3.3) |
+| — | `sync_state` | Tracks when each competition was last synced (NFR-1, NFR-2) |
+| `users` without a time zone | `timezone`, `ical_token`, `created_at` | FR-4, FR-7 |
 
-### 4.2 Diagrama entidad-relación
+### 4.2 Entity-relationship diagram
 
 ```mermaid
 erDiagram
-    sports ||--o{ competitions : tiene
-    sports ||--o{ competitors : tiene
-    sports ||--o{ event_kinds : define
-    nations ||--o{ competitors : representa
-    nations ||--o{ competitions : organiza
-    competitions ||--o{ events : agrupa
-    event_kinds ||--o{ events : clasifica
+    sports ||--o{ competitions : has
+    sports ||--o{ competitors : has
+    sports ||--o{ event_kinds : defines
+    nations ||--o{ competitors : represents
+    nations ||--o{ competitions : hosts
+    competitions ||--o{ events : groups
+    event_kinds ||--o{ events : classifies
     events ||--o{ events : "parent_event_id"
-    events ||--o{ event_participants : tiene
-    competitors ||--o{ event_participants : participa
-    users ||--o{ subscriptions : crea
-    subscriptions ||--o{ subscription_event_kinds : filtra
+    events ||--o{ event_participants : has
+    competitors ||--o{ event_participants : "takes part"
+    users ||--o{ subscriptions : creates
+    subscriptions ||--o{ subscription_event_kinds : filters
     event_kinds ||--o{ subscription_event_kinds : ""
     competitions ||--o{ sync_state : ""
 
@@ -199,7 +196,7 @@ erDiagram
         int competition_id FK "nullable"
         int event_kind_id FK
         int parent_event_id FK "nullable"
-        string title "ej. GP de México – Carrera"
+        string title "e.g. Mexico City GP – Race"
         timestamptz start_time
         enum time_precision
         enum status
@@ -218,26 +215,26 @@ erDiagram
         int id PK
         string email UK
         string hashed_password
-        string timezone "IANA, ej. America/Santiago"
+        string timezone "IANA, e.g. America/Santiago"
         string ical_token UK
     }
 ```
 
-### 4.3 Semántica de las suscripciones
+### 4.3 Subscription semantics
 
-- **Dentro** de una suscripción, los filtros se combinan con **Y**:
-  `competitor = Barcelona` **y** `competition = Champions`.
-- **Entre** suscripciones se combinan con **O** (RF-3).
-- `subscription_event_kinds` **vacío = todos los tipos**. La interfaz preselecciona
-  los tipos por defecto del deporte (`event_kinds.is_default`; en F1:
-  clasificación, sprint y carrera), así el usuario solo cambia lo que quiere.
-- `nation_id`: eventos donde participa un competidor de esa nación (selecciones
-  nacionales, tenistas de un país).
+- **Within** a subscription, filters are combined with **AND**:
+  `competitor = Barcelona` **and** `competition = Champions League`.
+- **Across** subscriptions they are combined with **OR** (FR-3).
+- An **empty** `subscription_event_kinds` means **all kinds**. The UI preselects
+  the sport's default kinds (`event_kinds.is_default`; for F1: qualifying, sprint
+  and race), so users only change what they want.
+- `nation_id`: events where a competitor from that nation takes part (national
+  teams, a country's tennis players).
 
-### 4.4 La consulta central
+### 4.4 The core query
 
-Todo el sistema (calendario web, app y feed iCal) depende de esta consulta, así
-que hay que diseñarla y crear sus índices desde el principio:
+The whole system (web calendar, app and iCal feed) depends on this query, so it
+has to be designed, and indexed, from the start:
 
 ```sql
 SELECT DISTINCT e.*
@@ -257,11 +254,11 @@ WHERE e.start_time BETWEEN :from AND :to
                               WHERE k.subscription_id = s.id));
 ```
 
-Índices iniciales: `events (competition_id, start_time)`, `events (sport_id, start_time)`,
-`event_participants (competitor_id, event_id)` y `subscriptions (user_id)`.
-Cuando haya datos reales se valida con `EXPLAIN ANALYZE`, no a ojo.
+Initial indexes: `events (competition_id, start_time)`, `events (sport_id, start_time)`,
+`event_participants (competitor_id, event_id)` and `subscriptions (user_id)`.
+Once there is real data they are validated with `EXPLAIN ANALYZE`, not by eye.
 
-### 4.5 Mapeo con fuentes externas
+### 4.5 Mapping to external sources
 
 ```
 competition_external_refs (competition_id FK, source, external_id)  UNIQUE (source, external_id)
@@ -269,151 +266,150 @@ competitor_external_refs  (competitor_id  FK, source, external_id)  UNIQUE (sour
 event_external_refs       (event_id       FK, source, external_id)  UNIQUE (source, external_id)
 ```
 
-Usamos tres tablas con la misma forma en lugar de una sola `external_ids`
-polimórfica: es la misma razón por la que eliminamos el `event_participants`
-polimórfico, cada fila tiene una FK real. El `UNIQUE (source, external_id)`
-es lo que hace **idempotente** el upsert de la ingesta.
+We use three identically shaped tables instead of a single polymorphic
+`external_ids` table, for the same reason we dropped the polymorphic
+`event_participants`: every row has a real FK. The `UNIQUE (source, external_id)`
+constraint is what makes the ingestion upsert **idempotent**.
 
-### 4.6 Extensión posterior al MVP: seguir jugadores dentro de un equipo
+### 4.6 Post-MVP extension: following players within a team
 
-**Semántica elegida:** seguir a un jugador = los eventos de **los equipos que integra**
-(club y selección), no solo los partidos en que está en la alineación. Las
-alineaciones se conocen ~1 h antes y no vienen en los planes gratuitos, así que
-no sirven para un calendario. La interfaz lo muestra como *"Partidos de los equipos de Messi"*.
+**Chosen semantics:** following a player = the events of **the teams they play for**
+(club and national team), not just the matches where they are in the lineup.
+Lineups are known ~1 h before kick-off and aren't included in free plans, so they
+are useless for a calendar. The UI labels it *"Matches of Messi's teams"*.
 
 ```
 competitor_memberships
   member_id   FK → competitors (kind = individual)
   team_id     FK → competitors (kind = team)
   valid_from  date
-  valid_to    date NULL          -- NULL = vigente
+  valid_to    date NULL          -- NULL = current
 ```
 
-Es una **relación temporal**: un traspaso cierra una pertenencia y abre otra, y
-las suscripciones existentes siguen funcionando sin cambios. La consulta central
-amplía el filtro por competidor a *"participa el competidor **o** un equipo al que
-pertenecía en la fecha del evento"*. El mismo mecanismo cubre las parejas de dobles
-en tenis y piloto ↔ escudería en F1.
+This is a **temporal relationship**: a transfer closes one membership and opens
+another, and existing subscriptions keep working unchanged. The core query
+extends the competitor filter to *"the competitor takes part **or** a team they
+belonged to on the event date takes part"*. The same mechanism covers tennis
+doubles pairs and driver ↔ constructor in F1.
 
-Pendiente: verificar de qué fuente se sincronizan los planteles y cuánta cuota consume.
+To do: verify which source provides squads and how much quota syncing them costs.
 
-## 5. Arquitectura
+## 5. Architecture
 
-### 5.1 Componentes
+### 5.1 Components
 
 ```mermaid
 flowchart LR
-    subgraph Clientes
+    subgraph Clients
         WEB[Web<br/>Next.js]
         MOB[Mobile<br/>Expo · post-MVP]
         CAL[Google / Apple<br/>Calendar]
     end
 
     subgraph Backend
-        API[API<br/>FastAPI · sin estado]
+        API[API<br/>FastAPI · stateless]
         BEAT[Scheduler<br/>Celery Beat]
         WRK[Workers<br/>Celery]
-        PROV[Adaptadores<br/>EventProvider]
+        PROV[Adapters<br/>EventProvider]
     end
 
     PG[(PostgreSQL)]
-    RD[(Redis<br/>cola · caché · locks)]
-    EXT[APIs externas<br/>y sitios scrapeados]
+    RD[(Redis<br/>queue · cache · locks)]
+    EXT[External APIs<br/>and scraped sites]
 
     WEB -- REST/JSON --> API
     MOB -- REST/JSON --> API
     CAL -- GET .ics --> API
     API --> PG
     API --> RD
-    BEAT -- encola tareas --> RD
-    RD -- consume --> WRK
+    BEAT -- enqueues tasks --> RD
+    RD -- consumes --> WRK
     WRK --> PROV --> EXT
     WRK -- upsert --> PG
 ```
 
-| Componente | Responsabilidad | Por qué así |
+| Component | Responsibility | Why this way |
 |---|---|---|
-| **API** | Autenticación, suscripciones, calendario, feed iCal | **Sin estado**: para escalar basta con agregar instancias detrás de un balanceador |
-| **Workers** | Ingesta (llamar a las fuentes, normalizar, upsert) | Separados de la API: una fuente lenta o caída no afecta a los usuarios |
-| **Scheduler** | Dispara la sincronización diaria | Un solo proceso, para no encolar tareas duplicadas |
-| **PostgreSQL** | Fuente de verdad | Datos relacionales con restricciones fuertes; es justo lo que necesita el modelo |
-| **Redis** | Cola de Celery, caché del feed iCal, locks de sincronización, contadores de cuota | Ya está en el stack; cubre cuatro necesidades con una sola pieza |
+| **API** | Authentication, subscriptions, calendar, iCal feed | **Stateless**: scaling means adding instances behind a load balancer |
+| **Workers** | Ingestion (call sources, normalize, upsert) | Separate from the API: a slow or failing source never affects users |
+| **Scheduler** | Triggers the daily sync | A single process, so tasks are never enqueued twice |
+| **PostgreSQL** | Source of truth | Relational data with strong constraints, exactly what the model needs |
+| **Redis** | Celery queue, iCal feed cache, sync locks, quota counters | Already in the stack; covers four needs with one component |
 
-### 5.2 Flujos principales
+### 5.2 Main flows
 
-**A. Sincronización diaria (RNF-1)**
-1. Celery Beat encola `sync_followed_competitions` una vez al día.
-2. La tarea busca las competiciones con **al menos un suscriptor**, directo o
-   indirecto (un equipo seguido arrastra sus competiciones).
-3. Por cada una, encola `sync_competition(competition_id)`.
-4. `sync_competition` toma un **lock en Redis** (`SET NX` con expiración). Si otra
-   tarea ya está sincronizando esa competición, termina sin hacer nada.
-5. El adaptador descarga los datos, los **normaliza** a DTOs comunes, resuelve las
-   entidades con `*_external_refs` y hace **upsert**.
-6. Actualiza `sync_state.last_synced_at`.
+**A. Daily sync (NFR-1)**
+1. Celery Beat enqueues `sync_followed_competitions` once a day.
+2. The task finds competitions with **at least one subscriber**, direct or
+   indirect (a followed team pulls in its competitions).
+3. For each one it enqueues `sync_competition(competition_id)`.
+4. `sync_competition` takes a **Redis lock** (`SET NX` with expiry). If another
+   task is already syncing that competition, it exits without doing anything.
+5. The adapter downloads the data, **normalizes** it into common DTOs, resolves
+   entities through `*_external_refs` and **upserts** it.
+6. It updates `sync_state.last_synced_at`.
 
-**B. Nueva suscripción (RF-8, RNF-2)**
-1. `POST /api/v1/subscriptions` guarda la suscripción y responde de inmediato.
-2. Si la competición involucrada tiene `last_synced_at` vacío o de hace más de 24 h,
-   encola `sync_competition`. El lock del paso A.4 evita duplicados.
+**B. New subscription (FR-8, NFR-2)**
+1. `POST /api/v1/subscriptions` stores the subscription and responds immediately.
+2. If the competition involved has an empty `last_synced_at`, or one older than
+   24 h, it enqueues `sync_competition`. The lock from step A.4 prevents duplicates.
 
-**C. Feed iCal (RF-7)**
-1. `GET /calendar/{ical_token}.ics` busca al usuario por su token.
-2. Si hay respuesta en caché en Redis (TTL 1 h), la devuelve.
-3. Si no, ejecuta la consulta central (§4.4), genera el `.ics` y lo guarda en caché.
+**C. iCal feed (FR-7)**
+1. `GET /calendar/{ical_token}.ics` looks up the user by token.
+2. If there is a cached response in Redis (1 h TTL), it returns it.
+3. Otherwise it runs the core query (§4.4), renders the `.ics` and caches it.
 
-> **Usamos TTL en vez de invalidar la caché.** Invalidar exacto ("este cambio afecta
-> a estos usuarios") es complejo y propenso a errores. Como los datos se actualizan
-> una vez al día y Google consulta cada varias horas, una hora de retraso extra no
-> le importa a nadie. Es una decisión consciente: código más simple a cambio de
-> datos algo menos frescos.
+> **We use a TTL instead of cache invalidation.** Exact invalidation ("this change
+> affects these users") is complex and error-prone. Since the data refreshes once a
+> day and Google polls every few hours, one extra hour of delay matters to no one.
+> It is a deliberate trade-off: simpler code in exchange for slightly less fresh data.
 
-### 5.3 Control de cuota (RNF-3)
+### 5.3 Quota control (NFR-3)
 
-Cada adaptador declara su límite (por ejemplo, `10/min` o `100/día`). Antes de cada
-llamada, un contador en Redis por fuente y por ventana de tiempo decide si se puede
-llamar. Si no hay cupo, la tarea **se reprograma** en vez de fallar.
+Each adapter declares its limit (e.g. `10/min` or `100/day`). Before each call, a
+Redis counter per source and time window decides whether the call is allowed. If
+there is no budget left, the task is **rescheduled** instead of failing.
 
-### 5.4 Decisiones abiertas
+### 5.4 Open decisions
 
-- **Autenticación:** propia (JWT de acceso corto + refresh token) o con un proveedor
-  externo. Se decide en un ADR al empezar la fase de usuarios.
-- **Hosting:** se decide en la fase de despliegue.
+- **Authentication:** in-house (short-lived JWT access token + refresh token) or
+  an external provider. To be decided in an ADR at the start of the users phase.
+- **Hosting:** to be decided in the deployment phase.
 
-## 6. Estimación de carga
+## 6. Load estimate
 
-Supuestos para **1000 usuarios**:
+Assumptions for **1,000 users**:
 
-| Concepto | Cálculo | Resultado |
+| Item | Calculation | Result |
 |---|---|---|
-| Feed iCal | 1000 usuarios × ~6 consultas/día de Google o Apple | 6000 req/día ≈ **0,07 req/s** |
-| Web/app | 200 activos/día × 20 req | 4000 req/día ≈ **0,05 req/s** |
-| Pico (×10 sobre el promedio) | | **~1–2 req/s** |
-| Eventos de fútbol (12 competiciones) | ~380 partidos × 7 ligas + copas | **~4000 eventos/temporada** |
-| Eventos de F1 | 24 GP × ~5 sesiones | **~120 eventos/temporada** |
-| Cuota de football-data | 12 competiciones × 1 sync/día | **12 req/día** (el límite es 10/min) |
-| Cuota de Jolpica | 1–2 req/día | Muy por debajo de 500/h |
+| iCal feed | 1,000 users × ~6 polls/day from Google or Apple | 6,000 req/day ≈ **0.07 req/s** |
+| Web/app | 200 daily active × 20 req | 4,000 req/day ≈ **0.05 req/s** |
+| Peak (10× the average) | | **~1–2 req/s** |
+| Football events (12 competitions) | ~380 matches × 7 leagues + cups | **~4,000 events/season** |
+| F1 events | 24 GPs × ~5 sessions | **~120 events/season** |
+| football-data quota | 12 competitions × 1 sync/day | **12 req/day** (the limit is 10/min) |
+| Jolpica quota | 1–2 req/day | Far below 500/h |
 
-**Conclusión:** un servidor pequeño con PostgreSQL aguanta esta carga con mucho
-margen. El riesgo real **no es la carga sino la cuota de las fuentes**, y eso no
-depende de cuántos usuarios haya sino de cuántas competiciones se siguen.
+**Conclusion:** a small server with PostgreSQL handles this load with plenty of
+headroom. The real risk **is not load but source quota**, and that depends on how
+many competitions are followed, not on how many users there are.
 
-**Para crecer 100 veces (100 000 usuarios, ~100–200 req/s en pico)**, en este orden
-y solo cuando las métricas lo pidan:
-1. Más instancias de la API (es sin estado).
-2. Servir los `.ics` desde una CDN o desde Redis.
-3. Réplica de lectura de PostgreSQL para la consulta central.
-4. Más workers y, si hace falta, planes pagos en las fuentes.
+**To grow 100× (100,000 users, ~100–200 req/s at peak)**, in this order and only
+when the metrics call for it:
+1. More API instances (it's stateless).
+2. Serve the `.ics` files from a CDN or straight from Redis.
+3. A PostgreSQL read replica for the core query.
+4. More workers and, if needed, paid source plans.
 
-## 7. Plan por fases
+## 7. Phased plan
 
-| Fase | Contenido | Requisitos |
+| Phase | Content | Requirements |
 |---|---|---|
-| **0. Base** | Mover el CI a `.github/workflows/` con PostgreSQL como servicio; `pydantic-settings` y secretos en `.env`; `docker-compose` en la raíz; README; `CLAUDE.md`; pre-commit con Ruff | RNF-7, RNF-8 |
-| **1. Diseño** | Este documento y los ADRs | — |
-| **2. Modelo v2** | Modelos SQLAlchemy y **una migración inicial nueva** (no hay datos en producción, así que reiniciar el historial de migraciones es más limpio que encadenar cambios); seed del catálogo | §4 |
-| **3. Ingesta** | Interfaz `EventProvider`; adaptadores de football-data y Jolpica; `sync_state`, locks y cuota; Celery Beat; tests con respuestas grabadas (fixtures) | RF-5, RF-6, RNF-1–3, RNF-6 |
-| **4. Usuarios y calendario** | Autenticación; CRUD de suscripciones; endpoint del calendario; feed iCal; sincronización al suscribirse | RF-1–4, RF-7, RF-8, RNF-5 |
-| **5. Web** | Cliente generado desde OpenAPI (`packages/api-client`); UI para crear suscripciones y ver el calendario | — |
-| **6. Despliegue** | Hosting, base de datos administrada, logs y métricas, alertas (por ejemplo, "un adaptador devolvió 0 eventos") | RNF-4 |
-| **Post-MVP** | Seguir jugadores (§4.6), tenis, básquet, NFL, MMA, boxeo (scraping), app móvil, eventos propios, frecuencia adaptativa | — |
+| **0. Foundation** | Move CI to `.github/workflows/` with a PostgreSQL service; `pydantic-settings` and secrets in `.env`; `docker-compose` at the root; README; `CLAUDE.md`; pre-commit with Ruff | NFR-7, NFR-8 |
+| **1. Design** | This document and the ADRs | — |
+| **2. Model v2** | SQLAlchemy models and **a fresh initial migration** (there is no production data, so resetting the migration history is cleaner than chaining changes); catalog seed | §4 |
+| **3. Ingestion** | `EventProvider` interface; football-data and Jolpica adapters; `sync_state`, locks and quota; Celery Beat; tests with recorded responses (fixtures) | FR-5, FR-6, NFR-1–3, NFR-6 |
+| **4. Users and calendar** | Authentication; subscription CRUD; calendar endpoint; iCal feed; sync on subscribe | FR-1–4, FR-7, FR-8, NFR-5 |
+| **5. Web** | Client generated from OpenAPI (`packages/api-client`); UI to create subscriptions and view the calendar | — |
+| **6. Deployment** | Hosting, managed database, logs and metrics, alerts (e.g. "an adapter returned 0 events") | NFR-4 |
+| **Post-MVP** | Following players (§4.6), tennis, basketball, NFL, MMA, boxing (scraping), mobile app, user-created events, adaptive frequency | — |

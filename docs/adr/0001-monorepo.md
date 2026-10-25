@@ -1,29 +1,29 @@
-# 0001 — Monorepo para backend, web y mobile
+# 0001 — Monorepo for backend, web and mobile
 
-- **Estado:** Aceptado
-- **Fecha:** 2026-10-21
+- **Status:** Accepted
+- **Date:** 2026-10-21
 
-## Contexto
+## Context
 
-El proyecto empezó en dos repos (`sports-calendar-backend` y `sports-calendar-frontend`).
-El plan incluye web y app móvil, que van a consumir la misma API. El desarrollo lo hace
-una sola persona.
+The project started as two repositories (`sports-calendar-backend` and
+`sports-calendar-frontend`). The plan includes a web app and a mobile app, both
+consuming the same API. Development is done by a single person.
 
-## Decisión
+## Decision
 
-Un único repositorio `sports-calendar` con `backend/` (Python) y `frontend/`
-(Turborepo: `apps/web`, `apps/mobile`, `packages/*`). Los repos originales se importaron
-con `git subtree add`, conservando su historial.
+A single `sports-calendar` repository with `backend/` (Python) and `frontend/`
+(Turborepo: `apps/web`, `apps/mobile`, `packages/*`). The original repositories were
+imported with `git subtree add`, preserving their history.
 
-## Consecuencias
+## Consequences
 
-- ✅ Un cambio en la API y en sus clientes va en un mismo commit o PR.
-- ✅ `packages/api-client`, generado desde el OpenAPI de FastAPI, lo comparten web y
-  mobile; si cambia el contrato, el TypeScript falla al compilar.
-- ✅ Un solo enlace de portafolio que muestra el sistema completo.
-- ⚠️ El CI necesita filtros por ruta para no correr los tests de Python cuando solo
-  cambia el frontend, y al revés.
-- ⚠️ Los commits importados conservan las rutas originales; para seguir un archivo
-  a través de la migración se usa `git log --follow`.
-- La estructura del repo **no afecta** la escala en tiempo de ejecución: cada componente
-  se despliega por separado.
+- ✅ A change to the API and to its clients lands in a single commit or PR.
+- ✅ `packages/api-client`, generated from FastAPI's OpenAPI schema, is shared by web
+  and mobile; if the contract changes, TypeScript fails to compile.
+- ✅ A single portfolio link shows the whole system.
+- ⚠️ CI needs path filters so Python tests don't run when only the frontend changes,
+  and vice versa.
+- ⚠️ Imported commits keep their original paths; to follow a file across the
+  migration, use `git log --follow`.
+- Repository structure **does not affect** runtime scale: each component is deployed
+  independently.

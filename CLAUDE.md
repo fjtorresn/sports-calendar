@@ -1,44 +1,48 @@
 # CLAUDE.md
 
-Guía para trabajar en este repo con Claude Code.
+Guide for working on this repository with Claude Code.
 
-## Contexto
+## Context
 
-- Proyecto de portafolio y de aprendizaje. **Explicar las decisiones** (qué, por qué y
-  qué alternativas hubo) antes y durante la implementación, no solo escribir código.
-  Responder en español.
-- Antes de cambios de diseño, leer [docs/design.md](docs/design.md) y los ADRs de
-  [docs/adr/](docs/adr/). Si una decisión cambia, se escribe un ADR nuevo que reemplaza
-  al anterior; los ADRs aceptados no se reescriben.
-- Los requisitos tienen IDs (`RF-n`, `RNF-n`, en design.md §2): citarlos en PRs y tests.
+- This is a portfolio and learning project. **Explain decisions** (what, why, and which
+  alternatives were considered) before and during implementation, not just the code.
+- **Language:** everything in the repository is in **English**: code, identifiers,
+  comments, docstrings, log messages, docs, ADRs, commit messages and PR descriptions.
+  Conversation with the user is in **Spanish**.
+- Before design changes, read [docs/design.md](docs/design.md) and the ADRs in
+  [docs/adr/](docs/adr/). If a decision changes, write a new ADR that supersedes the
+  old one; accepted ADRs are never rewritten.
+- Requirements have IDs (`FR-n`, `NFR-n`, design.md §2): reference them in PRs and tests.
 
-## Estructura
+## Layout
 
-- `backend/`: Python 3.13 gestionado con **uv**. El paquete es `app` (src layout:
-  `backend/src/app`) y los imports son `from app.x import y`, nunca `src.app`.
-- `frontend/`: Turborepo con npm workspaces (`apps/web`, `packages/*`).
-- Docker Compose en la raíz; la configuración vive en `.env` (copiar de `.env.example`).
+- `backend/`: Python 3.13 managed with **uv**. The package is `app` (src layout:
+  `backend/src/app`), imported as `from app.x import y`, never `src.app`.
+- `frontend/`: Turborepo with npm workspaces (`apps/web`, `packages/*`).
+- Docker Compose lives at the root; settings live in `.env` (copied from `.env.example`).
 
-## Comandos (backend, desde `backend/`)
+## Commands (backend, from `backend/`)
 
 ```bash
-uv sync                              # instalar dependencias
-uv run pytest                        # tests (necesita: docker compose up -d db)
+uv sync                              # install dependencies
+uv run pytest                        # tests (requires: docker compose up -d db)
 uv run ruff check . --fix && uv run ruff format .
-uv run alembic revision --autogenerate -m "mensaje"
+uv run alembic revision --autogenerate -m "message"
 uv run alembic upgrade head
 ```
 
-## Convenciones
+## Conventions
 
-- **Ramas:** `feat/…`, `fix/…`, `chore/…`, `docs/…`. Nunca commits directos a `main`; todo entra por PR.
-- **Commits:** [Conventional Commits](https://www.conventionalcommits.org/) en inglés
-  (`feat: add iCal endpoint`). Commits pequeños, cada uno con un propósito.
-- **Configuración:** todo valor que cambie entre entornos o que sea secreto va en
-  `app.core.config.Settings`, leído del entorno. Nada de URLs ni contraseñas en el código.
-- **Base de datos:** cada cambio de modelo va con su migración de Alembic. Los tests
-  corren contra **PostgreSQL real**, nunca SQLite.
-- **Modelos:** cada modelo nuevo se registra en `app/models/__init__.py`.
-- **Dependencias:** se agregan con `uv add` (o `uv add --dev`); `uv.lock` se commitea.
-- **Fuentes de datos:** cada fuente es un adaptador de `EventProvider` (ADR 0002); el
-  resto del sistema no conoce detalles de las fuentes.
+- **Branches:** `feat/…`, `fix/…`, `chore/…`, `docs/…`. Never commit directly to `main`;
+  everything goes through a PR.
+- **Commits:** [Conventional Commits](https://www.conventionalcommits.org/)
+  (`feat: add iCal endpoint`). Small commits, one purpose each.
+- **Comments** explain *why*, not *what*; don't restate the code.
+- **Settings:** any value that varies between environments or is secret goes in
+  `app.core.config.Settings`, read from the environment. No URLs or passwords in code.
+- **Database:** every model change ships with its Alembic migration. Tests run against
+  a **real PostgreSQL**, never SQLite.
+- **Models:** register every new model in `app/models/__init__.py`.
+- **Dependencies:** add them with `uv add` (or `uv add --dev`); commit `uv.lock`.
+- **Data sources:** each source is an `EventProvider` adapter (ADR 0002); the rest of
+  the system knows nothing about source details.
