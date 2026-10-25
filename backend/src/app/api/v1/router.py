@@ -1,5 +1,6 @@
 from fastapi import APIRouter
-from src.app.api.v1 import sports, events
+
+from app.api.v1 import events, sports
 
 api_router = APIRouter()
 
