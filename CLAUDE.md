@@ -29,6 +29,8 @@ uv run pytest                        # tests (requires: docker compose up -d db)
 uv run ruff check . --fix && uv run ruff format .
 uv run alembic revision --autogenerate -m "message"
 uv run alembic upgrade head
+uv run alembic check                # models and migrations must not drift
+uv run python -m app.scripts.seed    # idempotent MVP catalog
 ```
 
 ## Conventions
@@ -42,7 +44,11 @@ uv run alembic upgrade head
   `app.core.config.Settings`, read from the environment. No URLs or passwords in code.
 - **Database:** every model change ships with its Alembic migration. Tests run against
   a **real PostgreSQL**, never SQLite.
-- **Models:** register every new model in `app/models/__init__.py`.
+- **Models:** register every new model in `app/models/__init__.py`. Fixed-value columns are
+  `StrEnum`s mapped with `string_enum()` (ADR 0005); changing their values needs a
+  hand-written migration, since `alembic check` can't see it.
+- **Tests:** use the `db` fixture (rolled back after each test) and `tests/factories.py`.
+  Warnings are errors.
 - **Dependencies:** add them with `uv add` (or `uv add --dev`); commit `uv.lock`.
 - **Data sources:** each source is an `EventProvider` adapter (ADR 0002); the rest of
   the system knows nothing about source details.
