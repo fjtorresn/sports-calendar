@@ -1,0 +1,79 @@
+{
+  "MRData": {
+    "RaceTable": {
+      "season": "2026",
+      "Races": [
+        {
+          "season": "2026",
+          "round": "2",
+          "url": "https://en.wikipedia.org/wiki/2026_Chinese_Grand_Prix",
+          "raceName": "Chinese Grand Prix",
+          "Circuit": {
+            "circuitId": "shanghai",
+            "url": "https://en.wikipedia.org/wiki/Shanghai_International_Circuit",
+            "circuitName": "Shanghai International Circuit",
+            "Location": {
+              "lat": "31.3389",
+              "long": "121.22",
+              "locality": "Shanghai",
+              "country": "China"
+            }
+          },
+          "date": "2026-03-15",
+          "time": "07:00:00Z",
+          "FirstPractice": {
+            "date": "2026-03-13",
+            "time": "03:30:00Z"
+          },
+          "Qualifying": {
+            "date": "2026-03-14",
+            "time": "07:00:00Z"
+          },
+          "Sprint": {
+            "date": "2026-03-14",
+            "time": "03:00:00Z"
+          },
+          "SprintQualifying": {
+            "date": "2026-03-13",
+            "time": "07:30:00Z"
+          }
+        },
+        {
+          "season": "2026",
+          "round": "21",
+          "url": "https://en.wikipedia.org/wiki/2026_Las_Vegas_Grand_Prix",
+          "raceName": "Las Vegas Grand Prix",
+          "Circuit": {
+            "circuitId": "vegas",
+            "url": "https://en.wikipedia.org/wiki/Las_Vegas_Grand_Prix#Circuit",
+            "circuitName": "Las Vegas Strip Street Circuit",
+            "Location": {
+              "lat": "36.1147",
+              "long": "-115.173",
+              "locality": "Las Vegas",
+              "country": "USA"
+            }
+          },
+          "date": "2026-11-22",
+          "time": "04:00:00Z",
+          "FirstPractice": {
+            "date": "2026-11-20",
+            "time": "00:30:00Z"
+          },
+          "SecondPractice": {
+            "date": "2026-11-20",
+            "time": "04:00:00Z"
+          },
+          "ThirdPractice": {
+            "date": "2026-11-21",
+            "time": "00:30:00Z"
+          },
+          "Qualifying": {
+            "date": "2026-11-21",
+            "time": "04:00:00Z"
+          }
+        }
+      ]
+    }
+  }
+}

@@ -61,6 +61,25 @@ cp .env.example .env          # local settings
 docker compose up --build     # API at http://localhost:8000/docs
 ```
 
+### Try it locally (MVP)
+
+```bash
+cp .env.example .env               # then set FOOTBALL_DATA_API_KEY (free at football-data.org)
+docker compose up -d --build
+cd backend
+uv run python -m app.scripts.seed            # catalog: football (13 competitions) + F1
+uv run python -m app.scripts.sync --all      # real data from football-data.org and Jolpica
+uv run python -m app.scripts.user create --email me@example.com --timezone America/Santiago
+uv run python -m app.scripts.user follow --email me@example.com --competitor Barcelona
+uv run python -m app.scripts.user follow --email me@example.com --sport formula-1 --kinds qualifying,sprint,race
+uv run python -m app.scripts.user list --email me@example.com   # prints your iCal URL
+```
+
+Open the iCal URL in a calendar app that can reach `localhost` (GNOME Calendar,
+Thunderbird, Apple Calendar on the same machine), or save it with `curl` and import the
+file into Google Calendar. Subscribing from Google Calendar or a phone needs a public
+URL, which comes with deployment.
+
 **Backend without Docker** (using only `db` and `redis` from Docker):
 
 ```bash
@@ -93,7 +112,8 @@ cd frontend && npm install && npm run dev
 |---|---|
 | 0. Foundation (CI, settings, local environment) | ✅ |
 | 1. Design | ✅ |
-| 2. Data model v2 and core calendar query | 🔄 In progress |
+| 2. Data model v2 and core calendar query | ✅ |
+| MVP: ingestion, CLI subscriptions, iCal feed | 🔄 In progress |
 | 3. Ingestion (football-data.org, Jolpica F1) | ⏳ |
 | 4. Users, subscriptions, calendar and iCal feed | ⏳ |
 | 5. Web | ⏳ |

@@ -98,8 +98,8 @@ of the system** (see §3.4).
 
 | Sport | Main candidate (free) | Alternative | Notes |
 |---|---|---|---|
-| **Football** | [football-data.org](https://www.football-data.org/pricing) — 12 free competitions (Champions League, the top 5 leagues and the World Cup), 10 req/min | [API-Football](https://www.api-football.com/news/post/how-to-get-started-with-api-football-the-complete-beginners-guide) (API-Sports) — ~1,200 leagues, 100 req/day | football-data's free plan delays the data, which doesn't matter for a calendar. API-Football's season coverage: _unverified_ |
-| **F1** | [Jolpica-F1](https://docs.fastf1.dev/api_reference/jolpica.html) — Ergast's successor, open, 4 req/s and 500 req/h | API-Sports Formula-1 | The best situation of all: open, stable and data-rich |
+| **Football** | [football-data.org](https://www.football-data.org/pricing) — **13** free competitions (verified 2026-10-25: Champions League, Copa Libertadores, the top 5 leagues, Championship, Eredivisie, Primeira Liga, Brasileirão, World Cup, Euros), 10 req/min, one request returns a whole season | [API-Football](https://www.api-football.com/news/post/how-to-get-started-with-api-football-the-complete-beginners-guide) (API-Sports) — ~1,200 leagues, 100 req/day | football-data's free plan delays the data, which doesn't matter for a calendar. API-Football's season coverage: _unverified_ |
+| **F1** | [Jolpica-F1](https://docs.fastf1.dev/api_reference/jolpica.html) — Ergast's successor, open, 4 req/s and 500 req/h; one request returns every session of the season (verified) | API-Sports Formula-1 | The best situation of all: open, stable and data-rich |
 | **Basketball** | API-Basketball (API-Sports) — 100 req/day, NBA and international leagues | Unofficial ESPN API | ESPN's API has no documentation or terms of use: fallback only |
 | **NFL** | API-American-Football (API-Sports) — 100 req/day | Unofficial ESPN API, [TheSportsDB](https://www.thesportsdb.com/pricing) | |
 | **Tennis** | [Live Tennis API](https://duckdb.org/community_extensions/extensions/livetennis) — 100 req/day (_unverified_) | API-Tennis, scraping | The hardest sport to cover for free. Data quality must be tested before deciding |
@@ -380,6 +380,11 @@ Each adapter declares its limit (e.g. `10/min` or `100/day`). Before each call, 
 Redis counter per source and time window decides whether the call is allowed. If
 there is no budget left, the task is **rescheduled** instead of failing.
 
+> **MVP status:** the football-data adapter throttles on the source's own quota headers
+> (`X-Requests-Available-Minute`, `X-RequestCounter-Reset`) and retries 429s. With one
+> request per competition the daily sync costs 14 requests, so the shared Redis counters
+> are deferred until a source with a daily cap (API-Sports, 100/day) is added.
+
 ### 5.4 Open decisions
 
 - **Authentication:** in-house (short-lived JWT access token + refresh token) or
@@ -422,4 +427,5 @@ when the metrics call for it:
 | **4. Users and calendar** | Authentication; subscription CRUD; calendar endpoint (exposes the query from phase 2); iCal feed; sync on subscribe | FR-1–4, FR-7, FR-8, NFR-5 |
 | **5. Web** | Client generated from OpenAPI (`packages/api-client`); UI to create subscriptions and view the calendar | — |
 | **6. Deployment** | Hosting, managed database, logs and metrics, alerts (e.g. "an adapter returned 0 events") | NFR-4 |
+| **MVP slice** | Vertical slice through phases 3, 4 and 6: football-data + Jolpica ingestion, Celery beat, CLI-managed user and subscriptions (no login, no public write endpoints), iCal feed; then deployment | FR-3–8, NFR-1, NFR-2 |
 | **Post-MVP** | Following players (§4.6), tennis, basketball, NFL, MMA, boxing (scraping), mobile app, user-created events, adaptive frequency | — |

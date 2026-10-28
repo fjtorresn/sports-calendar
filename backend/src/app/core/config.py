@@ -22,6 +22,10 @@ class Settings(BaseSettings):
     environment: Literal["development", "test", "production"] = "development"
     database_url: str
     redis_url: str
+    # Only the football-data.org adapter needs it; everything else runs without it.
+    football_data_api_key: str | None = None
+    # Base URL printed in iCal links by the CLI (the deployed URL in production).
+    public_base_url: str = "http://localhost:8000"
 
 
 @lru_cache
